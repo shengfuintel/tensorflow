@@ -39,6 +39,12 @@ def _enable_half(repository_ctx):
     return repository_ctx.os.environ[_HALF_SUPPORT]
   return "0"
 
+def _crosscompile(repository_ctx):
+  if "CROSS_TOOLCHAIN" in repository_ctx.os.environ:
+    crossing = repository_ctx.os.environ["CROSS_TOOLCHAIN"].strip()
+    return crossing == "1"
+  return False
+
 def auto_configure_fail(msg):
   """Output failure message when auto configuration fails."""
   red = "\033[0;31m"
@@ -193,9 +199,15 @@ def _sycl_autoconf_impl(repository_ctx):
     python_include_path = repository_ctx.os.environ["CROSSTOOL_PYTHON_INCLUDE_PATH"]
   else:
     python_include_path = "/usr/include/python2.7"
-  gcc_toolchain_path = repository_ctx.os.environ["ARM_TOOLCHAIN"]
-  gcc_toolchain_name = repository_ctx.os.environ["ARM_TOOLCHAIN_NAME"]
-  opencl_includes = repository_ctx.os.environ["OPENCL_INCLUDES"]
+
+  if _crosscompile(repository_ctx):
+    gcc_toolchain_path = repository_ctx.os.environ["CROSS_TOOLCHAIN"]
+    gcc_toolchain_name = repository_ctx.os.environ["CROSS_TOOLCHAIN_NAME"]
+    opencl_includes = repository_ctx.os.environ["OPENCL_INCLUDES"]
+  else:
+    gcc_toolchain_path = ""
+    gcc_toolchain_name = ""
+    opencl_includes = ""
   spir_type = repository_ctx.os.environ["BITCODE_TARGET"]
 
   # SYCL toolchain bits
