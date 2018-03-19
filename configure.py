@@ -1406,12 +1406,11 @@ def main():
   set_action_env_var(environ_cp, 'TF_NEED_OPENCL_SYCL', 'OpenCL SYCL', False)
   if environ_cp.get('TF_NEED_OPENCL_SYCL') == '1':
     set_action_env_var(environ_cp, 'TF_NEED_COMPUTECPP', 'ComputeCPP', True)
+    set_sycl_data_types(environ_cp)
     if environ_cp.get('TF_NEED_COMPUTECPP') == '1':
       set_computecpp_toolkit_path(environ_cp)
     else:
       set_trisycl_include_dir(environ_cp)
-    set_action_env_var(environ_cp, 'TF_USE_DOUBLE_SYCL', 'double types in SYCL', True)
-    set_action_env_var(environ_cp, 'TF_USE_HALF_SYCL', 'half types in SYCL', False)
 
   set_action_env_var(environ_cp, 'TF_NEED_CUDA', 'CUDA', False)
   if (environ_cp.get('TF_NEED_CUDA') == '1' and
