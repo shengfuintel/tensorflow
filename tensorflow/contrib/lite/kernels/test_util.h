@@ -39,10 +39,10 @@ inline std::vector<T> Quantize(const std::vector<float>& data, float scale,
                                int32_t zero_point) {
   std::vector<T> q;
   for (float f : data) {
-    q.push_back(std::max(
+    q.push_back(static_cast<T>(std::max<float>(
         std::numeric_limits<T>::min(),
-        std::min(std::numeric_limits<T>::max(),
-                 static_cast<T>(std::round(zero_point + (f / scale))))));
+        std::min<float>(std::numeric_limits<T>::max(),
+                        std::round(zero_point + (f / scale))))));
   }
   return q;
 }
@@ -88,7 +88,9 @@ struct TensorData {
 class SingleOpResolver : public OpResolver {
  public:
   SingleOpResolver(const BuiltinOperator op, TfLiteRegistration* registration)
-      : op_(op), registration_(registration) {}
+      : op_(op), registration_(registration) {
+    registration_->builtin_code = op;
+  }
   TfLiteRegistration* FindOp(BuiltinOperator op) const override {
     if (op == op_) {
       return registration_;

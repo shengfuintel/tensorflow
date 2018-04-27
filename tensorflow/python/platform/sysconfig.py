@@ -28,7 +28,6 @@ import os.path as _os_path
 
 from tensorflow.python.framework.versions import CXX11_ABI_FLAG as _CXX11_ABI_FLAG
 from tensorflow.python.framework.versions import MONOLITHIC_BUILD as _MONOLITHIC_BUILD
-from tensorflow.python.util.all_util import remove_undocumented
 from tensorflow.python.util.tf_export import tf_export
 
 
@@ -68,7 +67,6 @@ def get_compile_flags():
   """
   flags = []
   flags.append('-I%s' % get_include())
-  flags.append('-I%s/external/nsync/public' % get_include())
   flags.append('-D_GLIBCXX_USE_CXX11_ABI=%d' % _CXX11_ABI_FLAG)
   return flags
 
@@ -85,6 +83,3 @@ def get_link_flags():
     flags.append('-L%s' % get_lib())
     flags.append('-ltensorflow_framework')
   return flags
-
-_allowed_symbols = []
-remove_undocumented(__name__, _allowed_symbols)

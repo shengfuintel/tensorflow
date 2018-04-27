@@ -61,14 +61,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow.python.util.all_util import remove_undocumented
-
 # pylint: disable=g-bad-import-order,unused-import
 
 # Base objects.
 from tensorflow.python.layers.base import Layer
 from tensorflow.python.layers.base import InputSpec
-from tensorflow.python.layers.network import Input
 
 # Core layers.
 from tensorflow.python.layers.core import Dense
@@ -123,7 +120,3 @@ from tensorflow.python.layers.normalization import BatchNormalization
 from tensorflow.python.layers.normalization import batch_normalization
 
 # pylint: enable=g-bad-import-order,unused-import
-
-_allowed_symbols = []
-
-remove_undocumented(__name__, _allowed_symbols)
