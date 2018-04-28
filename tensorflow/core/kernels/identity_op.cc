@@ -58,7 +58,16 @@ REGISTER_KERNEL_BUILDER(Name("DebugGradientRefIdentity").Device(DEVICE_CPU),
       IdentityOp);                                                           \
   REGISTER_KERNEL_BUILDER(                                                   \
       Name("StopGradient").Device(DEVICE_SYCL).TypeConstraint<type>("T"),    \
-      IdentityOp)
+      IdentityOp)                                                            \
+  REGISTER_KERNEL_BUILDER(Name("DebugGradientIdentity")                      \
+                              .Device(DEVICE_SYCL)                           \
+                              .TypeConstraint<type>("T"),                    \
+                          IdentityOp);                                       \
+  REGISTER_KERNEL_BUILDER(Name("PlaceholderWithDefault")                     \
+                              .Device(DEVICE_SYCL)                           \
+                              .TypeConstraint<type>("dtype"),                \
+                          IdentityOp)
+
 
 TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL_KERNEL);
 TF_CALL_int64(REGISTER_SYCL_KERNEL);
@@ -69,22 +78,36 @@ TF_CALL_int8(REGISTER_SYCL_KERNEL);
 
 #undef REGISTER_SYCL_KERNEL
 
-#define REGISTER_SYCL_HOST_KERNEL(type)                   \
-  REGISTER_KERNEL_BUILDER(Name("Identity")                \
-                              .Device(DEVICE_SYCL)        \
-                              .HostMemory("input")        \
-                              .HostMemory("output")       \
-                              .TypeConstraint<type>("T"), \
-                          IdentityOp);                    \
-  REGISTER_KERNEL_BUILDER(Name("RefIdentity")             \
-                              .Device(DEVICE_SYCL)        \
-                              .HostMemory("input")        \
-                              .HostMemory("output")       \
-                              .TypeConstraint<type>("T"), \
+#define REGISTER_SYCL_HOST_KERNEL(type)                       \
+  REGISTER_KERNEL_BUILDER(Name("Identity")                    \
+                              .Device(DEVICE_SYCL)            \
+                              .HostMemory("input")            \
+                              .HostMemory("output")           \
+                              .TypeConstraint<type>("T"),     \
+                          IdentityOp);                        \
+  REGISTER_KERNEL_BUILDER(Name("RefIdentity")                 \
+                              .Device(DEVICE_SYCL)            \
+                              .HostMemory("input")            \
+                              .HostMemory("output")           \
+                              .TypeConstraint<type>("T"),     \
+                          IdentityOp)                         \
+  REGISTER_KERNEL_BUILDER(Name("StopGradient")                \
+                              .Device(DEVICE_SYCL)            \
+                              .HostMemory("input")            \
+                              .HostMemory("output")           \
+                              .TypeConstraint<type>("T"),     \
+                          IdentityOp);                        \
+  REGISTER_KERNEL_BUILDER(Name("PlaceholderWithDefault")      \
+                              .Device(DEVICE_SYCL)            \
+                              .HostMemory("input")            \
+                              .HostMemory("output")           \
+                              .TypeConstraint<type>("dtype"), \
                           IdentityOp)
+
 
 REGISTER_SYCL_HOST_KERNEL(int32);
 REGISTER_SYCL_HOST_KERNEL(bool);
+REGISTER_SYCL_HOST_KERNEL(string);
 
 #undef REGISTER_SYCL_HOST_KERNEL
 
