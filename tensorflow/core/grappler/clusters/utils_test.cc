@@ -44,10 +44,18 @@ TEST(UtilsTest, GetLocalGPUInfo) {
   DeviceProperties properties;
 
   properties = GetLocalGPUInfo(CudaGpuId(0));
+#ifdef TENSORFLOW_USE_SYCL
+  EXPECT_EQ("SYCL", properties.type());
+#else
   EXPECT_EQ("GPU", properties.type());
+#endif  // TENSORFLOW_USE_SYCL
 
   properties = GetLocalGPUInfo(CudaGpuId(100));
+#ifdef TENSORFLOW_USE_SYCL
+  EXPECT_EQ("SYCL", properties.type());
+#else
   EXPECT_EQ("GPU", properties.type());
+#endif  // TENSORFLOW_USE_SYCL
 #endif
 }
 
@@ -69,7 +77,11 @@ TEST(UtilsTest, GetDeviceInfo) {
   device.type = "GPU";
   device.has_id = false;
   properties = GetDeviceInfo(device);
+#ifdef TENSORFLOW_USE_SYCL
+  EXPECT_EQ("SYCL", properties.type());
+#else
   EXPECT_EQ("GPU", properties.type());
+#endif  // TENSORFLOW_USE_SYCL
 #if GOOGLE_CUDA
   EXPECT_EQ("NVIDIA", properties.vendor());
 #endif
