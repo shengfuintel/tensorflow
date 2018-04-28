@@ -208,8 +208,10 @@ struct ApplyAdagrad<SYCLDevice, T> {
   void operator()(const SYCLDevice& d, typename TTypes<T>::Flat var,
                   typename TTypes<T>::Flat accum,
                   typename TTypes<T>::ConstScalar lr,
-                  typename TTypes<T>::ConstFlat grad) {
-    accum.device(d) += grad.square();
+                  typename TTypes<T>::ConstFlat grad, bool update_slots) {
+    if (update_slots) {
+      accum.device(d) += grad.square();
+    }
 #if !defined(EIGEN_HAS_INDEX_LIST)
     Eigen::array<int, 1> rank1{1};
 #else

@@ -133,6 +133,10 @@ struct AssignSYCL<scatter_op::UpdateOp::ASSIGN> {
   static void Run(Device d, Params p, Update u) {
     p.device(d) = u;
   }
+  template <typename Device, typename Params, typename Update>
+  static void RunScalar(Device d, Params p, Update u) {
+    p.device(d) = p.constant(u);
+  }
 };
 
 template <>
@@ -140,6 +144,11 @@ struct AssignSYCL<scatter_op::UpdateOp::ADD> {
   template <typename Device, typename Params, typename Update>
   static void Run(Device d, Params p, Update u) {
     p.device(d) += u;
+  }
+
+  template <typename Device, typename Params, typename Update>
+  static void RunScalar(Device d, Params p, Update u) {
+    p.device(d) = p + u;
   }
 };
 
@@ -473,7 +482,7 @@ struct ScatterScalarFunctorSYCL {
   Index operator()(OpKernelContext* c, const SYCLDevice& d,
                    typename TTypes<T>::Matrix params,
                    const typename TTypes<T>::ConstScalar update,
-                   typename TTypes<Index>::Flat indices) {
+                   typename TTypes<Index>::ConstFlat indices) {
     // indices and params sizes were validated in DoCompute().
     const Index N = static_cast<Index>(indices.size());
     const Index limit = static_cast<Index>(params.dimension(0));
@@ -481,12 +490,17 @@ struct ScatterScalarFunctorSYCL {
       const Index index = ::tensorflow::internal::SubtleMustCopy(indices(i));
       if (!FastBoundsCheck(index, limit)) return i;
       // Broadcast update to params[index]
-      scatter_op::internal::AssignSYCL<op>::Run(
+      scatter_op::internal::AssignSYCL<scatter_op::UpdateOp::ASSIGN>::RunScalar(
           d, params.template chip<0>(index), update());
     }
     return -1;
   }
 };
+
+template <typename T, typename Index, scatter_op::UpdateOp op>
+struct ScatterScalarFunctor<SYCLDevice, T, Index, op>
+    : ScatterScalarFunctorSYCL<T, Index, op> {};
+
 #endif  // TENSORFLOW_USE_SYCL
 
 }  // namespace functor

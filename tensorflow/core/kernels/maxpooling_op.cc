@@ -888,6 +888,19 @@ struct LaunchMaxPoolingWithArgmax<CPUDevice, T> {
   }
 };
 
+#ifdef TENSORFLOW_USE_SYCL
+template <typename T>
+struct LaunchMaxPoolingWithArgmax<SYCLDevice, T> {
+  static void launch(OpKernelContext* context, const PoolParameters& params,
+                     const Tensor& input, Tensor* output, Tensor* argmax,
+                     bool propagate_nans) {
+    Tensor unused;
+    SpatialMaxPoolWithArgMaxHelper<SYCLDevice, T>(
+        context, output, argmax, nullptr, input, unused, params);
+  }
+};
+#endif  // TENSORFLOW_USE_SYCL
+
 template <typename Device, typename T>
 class MaxPoolingWithArgmaxOp : public OpKernel {
  public:
@@ -1833,6 +1846,26 @@ class MaxPoolingGradGradOp<SYCLDevice, T> : public OpKernel {
   TensorFormat data_format_;
 };
 
+#define REGISTER_MAX_POOL_KERNELS_SYCL(D, T)                             \
+  REGISTER_KERNEL_BUILDER(                                               \
+      Name("MaxPoolGrad").Device(DEVICE_##D).TypeConstraint<T>("T"),     \
+      MaxPoolingGradOp<D##Device, T>);                                   \
+  REGISTER_KERNEL_BUILDER(                                               \
+      Name("MaxPoolGradGrad").Device(DEVICE_##D).TypeConstraint<T>("T"), \
+      MaxPoolingGradGradOp<D##Device, T>);                               \
+  REGISTER_KERNEL_BUILDER(Name("MaxPoolGradV2")                          \
+                              .Device(DEVICE_##D)                        \
+                              .HostMemory("ksize")                       \
+                              .HostMemory("strides")                     \
+                              .TypeConstraint<T>("T"),                   \
+                          MaxPoolingGradOp<D##Device, T>);               \
+  REGISTER_KERNEL_BUILDER(Name("MaxPoolGradGradV2")                      \
+                              .Device(DEVICE_##D)                        \
+                              .HostMemory("ksize")                       \
+                              .HostMemory("strides")                     \
+                              .TypeConstraint<T>("T"),                   \
+                          MaxPoolingGradGradOp<D##Device, T>);
+
 #define REGISTER_SYCL_MAX_POOL_KERNELS(T)                         \
   REGISTER_KERNEL_BUILDER(                                        \
       Name("MaxPool").Device(DEVICE_SYCL).TypeConstraint<T>("T"), \
@@ -1843,9 +1876,10 @@ class MaxPoolingGradGradOp<SYCLDevice, T> : public OpKernel {
                               .HostMemory("strides")              \
                               .TypeConstraint<T>("T"),            \
                           MaxPoolingV2Op<SYCLDevice, T>);         \
-  REGISTER_MAX_POOL_KERNELS(SYCL, T)
+  REGISTER_MAX_POOL_KERNELS_SYCL(SYCL, T)
 TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL_MAX_POOL_KERNELS);
 #undef REGISTER_SYCL_MAX_POOL_KERNELS
+#undef REGISTER_MAX_POOL_KERNELS_SYCL
 #endif  // TENSORFLOW_USE_SYCL
 #undef REGISTER_MAX_POOL_KERNELS
 

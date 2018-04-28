@@ -509,7 +509,7 @@ class SplitVOpSYCL : public SplitVOpBase<SYCLDevice, T, Tlen> {
         auto result_shaped = result->shaped<T, 3>(
             {prefix_dim_size, split_dim_output_size, suffix_dim_size});
 
-        functor::Split<SYCLDevice, T>()(context->eigen_device<SYCLDevice>(),
+        functor::Split<SYCLDevice, T, 3>()(context->eigen_device<SYCLDevice>(),
                                         result_shaped, input_reshaped,
                                         slice_indices, slice_sizes);
       }

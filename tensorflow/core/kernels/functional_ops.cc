@@ -186,11 +186,15 @@ REGISTER_KERNEL_BUILDER(Name("_If").Device(DEVICE_GPU).HostMemory("cond"),
                         IfOp);
 #ifdef TENSORFLOW_USE_SYCL
 REGISTER_KERNEL_BUILDER(Name("_If").Device(DEVICE_SYCL).HostMemory("cond"),
-                        FunctionalIf);
+                        IfOp);
 #endif  // TENSORFLOW_USE_SYCL
 
 REGISTER_KERNEL_BUILDER(Name("If").Device(DEVICE_CPU), IfOp);
 REGISTER_KERNEL_BUILDER(Name("If").Device(DEVICE_GPU).HostMemory("cond"), IfOp);
+#ifdef TENSORFLOW_USE_SYCL
+REGISTER_KERNEL_BUILDER(Name("If").Device(DEVICE_SYCL).HostMemory("cond"),
+                        IfOp);
+#endif  // TENSORFLOW_USE_SYCL
 
 class WhileOp : public AsyncOpKernel {
  public:
