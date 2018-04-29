@@ -120,9 +120,10 @@ class PrefetchingKernelsOpsTest(test.TestCase):
     if not test_util.is_gpu_available():
       self.skipTest("No GPU available")
 
+    gpu_name = test_util.gpu_device_name()
     self._prefetch_fn_helper_one_shot("cpu_gpu",
-                                      "/job:localhost/replica:0/task:0/cpu:0",
-                                      "/job:localhost/replica:0/task:0/gpu:0")
+                                     "/job:localhost/replica:0/task:0/cpu:0",
+                                     "/job:localhost/replica:0/task:0"+gpu_name)
 
   def testReinitialization(self):
     worker_config = config_pb2.ConfigProto()
@@ -308,8 +309,9 @@ class PrefetchToDeviceTest(test.TestCase):
       self.skipTest("No GPU available")
 
     host_dataset = dataset_ops.Dataset.range(10)
+    gpu_name = test_util.gpu_device_name()
     device_dataset = host_dataset.apply(
-        prefetching_ops.prefetch_to_device("/gpu:0"))
+        prefetching_ops.prefetch_to_device(gpu_name))
 
     iterator = device_dataset.make_one_shot_iterator()
     next_element = iterator.get_next()
@@ -360,8 +362,9 @@ class PrefetchToDeviceTest(test.TestCase):
       self.skipTest("No GPU available")
 
     host_dataset = dataset_ops.Dataset.range(10)
+    gpu_name = test_util.gpu_device_name()
     device_dataset = host_dataset.apply(
-        prefetching_ops.prefetch_to_device("/gpu:0"))
+        prefetching_ops.prefetch_to_device(gpu_name))
 
     iterator = device_dataset.make_initializable_iterator()
     next_element = iterator.get_next()

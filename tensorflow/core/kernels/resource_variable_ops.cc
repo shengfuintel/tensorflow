@@ -236,6 +236,11 @@ REGISTER_KERNEL_BUILDER(Name("DestroyResourceOp").Device(DEVICE_CPU),
 REGISTER_KERNEL_BUILDER(
     Name("DestroyResourceOp").Device(DEVICE_GPU).HostMemory("resource"),
     DestroyResourceOp);
+#ifdef TENSORFLOW_USE_SYCL
+REGISTER_KERNEL_BUILDER(
+    Name("DestroyResourceOp").Device(DEVICE_SYCL).HostMemory("resource"),
+    DestroyResourceOp);
+#endif //  TENSORFLOW_USE_SYCL
 
 template <typename Device, typename T>
 class AssignVariableOp : public OpKernel {
