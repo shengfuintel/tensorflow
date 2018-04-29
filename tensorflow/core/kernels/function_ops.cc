@@ -110,6 +110,12 @@ TF_CALL_bool(REGISTER) REGISTER_KERNEL_BUILDER(Name(kArgOp)
                                                    .HostMemory("output")
                                                    .TypeConstraint<int32>("T"),
                                                ArgOp);
+REGISTER_KERNEL_BUILDER(Name(kArgOp)
+                           .Device(DEVICE_SYCL)
+                           .HostMemory("output")
+                           .TypeConstraint<ResourceHandle>("T"),
+                       ArgOp);
+
 #undef REGISTER
 #define REGISTER(type)     \
   REGISTER_KERNEL_BUILDER( \

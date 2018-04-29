@@ -26,7 +26,7 @@ limitations under the License.
 namespace tensorflow {
 typedef Eigen::ThreadPoolDevice CPUDevice;
 #ifdef TENSORFLOW_USE_SYCL
-typedef Eigen::SyclDevice SyclDevice;
+typedef Eigen::SyclDevice SYCLDevice;
 #endif  // TENSORFLOW_USE_SYCL
 
 namespace functor {
@@ -61,13 +61,13 @@ Status DoParallelConcat(const CPUDevice& d, const Tensor& value, int32 loc,
 
 #ifdef TENSORFLOW_USE_SYCL
 template <>
-Status DoParallelConcat(const SyclDevice& d, const Tensor& value, int32 loc,
+Status DoParallelConcat(const SYCLDevice& d, const Tensor& value, int32 loc,
                         Tensor* output) {
   CHECK_EQ(value.dtype(), output->dtype());
   switch (value.dtype()) {
 #define CASE(type)                  \
   case DataTypeToEnum<type>::value: \
-    return DoParallelConcatUpdate<SyclDevice, type>(d, value, loc, output);
+    return DoParallelConcatUpdate<SYCLDevice, type>(d, value, loc, output);
     TF_CALL_SYCL_NUMBER_TYPES(CASE);
 #undef CASE
     default:
@@ -178,7 +178,7 @@ TF_CALL_POD_STRING_TYPES(REGISTER_PARALLEL_CONCAT);
   REGISTER_KERNEL_BUILDER(Name("_ParallelConcatStart")        \
                               .Device(DEVICE_SYCL)            \
                               .TypeConstraint<type>("dtype"), \
-                          ParallelConcatStart<SyclDevice, type>);
+                          ParallelConcatStart<SYCLDevice, type>);
 TF_CALL_SYCL_NUMBER_TYPES(REGISTER_EMPTY)
 #undef REGISTER_EMPTY
 
@@ -193,7 +193,7 @@ TF_CALL_SYCL_NUMBER_TYPES(REGISTER_PARALLEL_CONCAT);
   REGISTER_KERNEL_BUILDER(Name("_ParallelConcatUpdate")   \
                               .Device(DEVICE_SYCL)        \
                               .TypeConstraint<type>("T"), \
-                          ParallelConcatUpdate<SyclDevice>);
+                          ParallelConcatUpdate<SYCLDevice>);
 TF_CALL_SYCL_NUMBER_TYPES(REGISTER)
 #undef REGISTER
 
@@ -290,8 +290,8 @@ class InplaceOpBase : public OpKernel {
 
 namespace functor {
 
-template <typename T>
-void DoInplaceOp(const CPUDevice& d, InplaceOpType op, const Tensor& i,
+template <typename T, typename Device>
+void DoInplaceOp(const Device& d, InplaceOpType op, const Tensor& i,
                  const Tensor& v, Tensor* y) {
   auto Ti = i.flat<int32>();
   auto Tv = v.flat_outer_dims<T>();
@@ -326,14 +326,18 @@ void DoInplaceStringUpdateOp(const CPUDevice& d, const Tensor& i,
   }
 }
 
-template <>
-Status DoInplace(const CPUDevice& device, InplaceOpType op, const Tensor& i,
+template <typename Device>
+Status DoInplaceBase(const Device& device, InplaceOpType op, const Tensor& i,
                  const Tensor& v, Tensor* y) {
   CHECK_EQ(v.dtype(), y->dtype());
   if (op == I_UPDATE) {
     if (v.dtype() == DT_STRING) {
+#ifndef TENSORFLOW_USE_SYCL
       DoInplaceStringUpdateOp(device, i, v, y);
       return Status::OK();
+#else
+      return errors::Unimplemented("DT_STRING not allowed on SYCL device");
+#endif  // TENSORFLOW_USE_SYCL
     } else if (v.dtype() == DT_BOOL) {
       DoInplaceOp<bool>(device, op, i, v, y);
       return Status::OK();
@@ -351,6 +355,20 @@ Status DoInplace(const CPUDevice& device, InplaceOpType op, const Tensor& i,
   }
   return Status::OK();
 }
+
+template <>
+Status DoInplace(const CPUDevice& device, InplaceOpType op, const Tensor& i,
+                 const Tensor& v, Tensor* y) {
+  return DoInplaceBase(device, op, i, v, y);
+}
+
+#ifdef TENSORFLOW_USE_SYCL
+template <>
+Status DoInplace(const SYCLDevice& device, InplaceOpType op, const Tensor& i,
+                 const Tensor& v, Tensor* y) {
+  return DoInplaceBase(device, op, i, v, y);
+}
+#endif  // TENSORFLOW_USE_SYCL
 
 }  // end namespace functor
 
@@ -402,8 +420,8 @@ namespace functor {
 
 typedef Eigen::ThreadPoolDevice CPUDevice;
 
-template <>
-Status DoCopy(const CPUDevice& device, const Tensor& x, Tensor* y) {
+template <typename Device>
+Status DoCopyBase(const Device& device, const Tensor& x, Tensor* y) {
   CHECK_EQ(x.dtype(), y->dtype());
   switch (x.dtype()) {
 #define CASE(type)                                   \
@@ -419,6 +437,18 @@ Status DoCopy(const CPUDevice& device, const Tensor& x, Tensor* y) {
   }
   return Status::OK();
 }
+
+template <>
+Status DoCopy(const CPUDevice& device, const Tensor& x, Tensor* y) {
+  return DoCopyBase(device, x, y);
+}
+
+#ifdef TENSORFLOW_USE_SYCL
+template <>
+Status DoCopy(const SYCLDevice& device, const Tensor& x, Tensor* y) {
+  return DoCopyBase(device, x, y);
+}
+#endif  // TENSORFLOW_USE_SYCL
 
 }  // end namespace functor
 
@@ -538,5 +568,67 @@ REGISTER_EMPTY(int64, GPU);
 
 #endif  // GOOGLE_CUDA
 
+#ifdef TENSORFLOW_USE_SYCL
+#define REGISTER(TYPE)                                                     \
+  REGISTER_KERNEL_BUILDER(                                                 \
+      Name("InplaceUpdate").Device(DEVICE_SYCL).HostMemory("i")            \
+                           .TypeConstraint<TYPE>("T"),                     \
+      InplaceOp<SYCLDevice, functor::I_UPDATE>);                           \
+  REGISTER_KERNEL_BUILDER(                                                 \
+      Name("InplaceAdd").Device(DEVICE_SYCL).HostMemory("i")               \
+                        .TypeConstraint<TYPE>("T"),                        \
+      InplaceOp<SYCLDevice, functor::I_ADD>);                              \
+  REGISTER_KERNEL_BUILDER(                                                 \
+      Name("InplaceSub").Device(DEVICE_SYCL).HostMemory("i")               \
+                        .TypeConstraint<TYPE>("T"),                        \
+      InplaceOp<SYCLDevice, functor::I_SUB>);                              \
+  REGISTER_KERNEL_BUILDER(                                                 \
+      Name("DeepCopy").Device(DEVICE_SYCL).TypeConstraint<TYPE>("T"),      \
+      CopyOp<SYCLDevice>);
+
+TF_CALL_SYCL_NUMBER_TYPES(REGISTER)
+TF_CALL_int64(REGISTER);
+
+#undef REGISTER
+
+REGISTER_KERNEL_BUILDER(Name("InplaceUpdate")
+                            .Device(DEVICE_SYCL)
+                            .HostMemory("x")
+                            .HostMemory("i")
+                            .HostMemory("v")
+                            .HostMemory("y")
+                            .TypeConstraint<int32>("T"),
+                        InplaceOp<CPUDevice, functor::I_UPDATE>);
+REGISTER_KERNEL_BUILDER(Name("InplaceAdd")
+                            .Device(DEVICE_SYCL)
+                            .HostMemory("x")
+                            .HostMemory("i")
+                            .HostMemory("v")
+                            .HostMemory("y")
+                            .TypeConstraint<int32>("T"),
+                        InplaceOp<CPUDevice, functor::I_ADD>);
+REGISTER_KERNEL_BUILDER(Name("InplaceSub")
+                            .Device(DEVICE_SYCL)
+                            .HostMemory("x")
+                            .HostMemory("i")
+                            .HostMemory("v")
+                            .HostMemory("y")
+                            .TypeConstraint<int32>("T"),
+                        InplaceOp<CPUDevice, functor::I_SUB>);
+
+REGISTER_KERNEL_BUILDER(Name("DeepCopy")
+                            .Device(DEVICE_SYCL)
+                            .HostMemory("x")
+                            .HostMemory("y")
+                            .TypeConstraint<int32>("T"),
+                        CopyOp<CPUDevice>);
+
+#define REGISTER_SYCL(type) REGISTER_EMPTY(type, SYCL)
+TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL);
+TF_CALL_int64(REGISTER_SYCL);
+#undef REGISTER_SYCL
+#endif  // TENSORFLOW_USE_SYCL
+
+#undef REGISTER_EMPTY
 }  // end namespace
 }  // end namespace tensorflow
