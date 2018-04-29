@@ -124,7 +124,7 @@ DeviceProperties GetDeviceInfo(const DeviceNameUtils::ParsedName& device) {
 
   if (device.type == "CPU") {
     return GetLocalCPUInfo();
-  } else if (device.type == "GPU" || device.type == "SYCL") {
+  } else if (device.type == "GPU") {
     if (device.has_id) {
       TfGpuId tf_gpu_id(device.id);
       CudaGpuId cuda_gpu_id;
