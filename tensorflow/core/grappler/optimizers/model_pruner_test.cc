@@ -365,14 +365,25 @@ TEST_F(ModelPrunerTest, PruningPerservesCrossDeviceIdentity) {
   Output c = ops::Const(s.WithOpName("c").WithDevice("/cpu:0"), 0.0f, {10, 10});
 
   // Node i1 should be preserved.
+#ifdef TENSORFLOW_USE_SYCL
+  Output i1 = ops::Identity(s.WithOpName("i1").WithDevice("/device:SYCL:0"), c);
+  Output a1 = ops::Sqrt(s.WithOpName("a1").WithDevice("/device:SYCL:0"), {i1});
+  Output a2 = ops::Sqrt(s.WithOpName("a2").WithDevice("/device:SYCL:0"), {i1});
+#else
   Output i1 = ops::Identity(s.WithOpName("i1").WithDevice("/device:GPU:0"), c);
   Output a1 = ops::Sqrt(s.WithOpName("a1").WithDevice("/device:GPU:0"), {i1});
   Output a2 = ops::Sqrt(s.WithOpName("a2").WithDevice("/device:GPU:0"), {i1});
+#endif  // TENSORFLOW_USE_SYCL
 
   // Node i2 should be pruned since it resides on the sender's device.
   Output i2 = ops::Identity(s.WithOpName("i2").WithDevice("/cpu:0"), c);
+  Output a3 = ops::Sqrt(s.WithOpName("a3").WithDevice("/device:SYCL:0"), {i2});
+  Output a4 = ops::Sqrt(s.WithOpName("a4").WithDevice("/device:SYCL:0"), {i2});
+#ifdef TENSORFLOW_USE_SYCL
+#else
   Output a3 = ops::Sqrt(s.WithOpName("a3").WithDevice("/device:GPU:0"), {i2});
   Output a4 = ops::Sqrt(s.WithOpName("a4").WithDevice("/device:GPU:0"), {i2});
+#endif  // TENSORFLOW_USE_SYCL
 
   GrapplerItem item;
   TF_CHECK_OK(s.ToGraphDef(&item.graph));
