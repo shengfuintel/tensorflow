@@ -143,7 +143,7 @@ template <>
 struct AssignSYCL<scatter_op::UpdateOp::ADD> {
   template <typename Device, typename Params, typename Update>
   static void Run(Device d, Params p, Update u) {
-    p.device(d) += u;
+    p.device(d) = p + u;
   }
 
   template <typename Device, typename Params, typename Update>
@@ -156,7 +156,7 @@ template <>
 struct AssignSYCL<scatter_op::UpdateOp::SUB> {
   template <typename Device, typename Params, typename Update>
   static void Run(Device d, Params p, Update u) {
-    p.device(d) -= u;
+    p.device(d) = p - u;
   }
 };
 
