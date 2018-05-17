@@ -900,12 +900,23 @@ namespace {
 // logic is so simple we can just replicate it here, where it is close to its
 // usage and easy to change later. And there's the extra benefit of not
 // accessing an 'internal' namespace.
+#ifdef TENSORFLOW_USE_SYCL
+// TODO{lukeiwanski}: Remove once ComputeCpp 0.9 available
+template<typename T>
+inline const T PrintOneElement(const T a) {
+  return a;
+}
+inline float PrintOneElement(const Eigen::half& h) {
+  return static_cast<float>(h);
+}
+#else
 inline const strings::AlphaNum& PrintOneElement(const strings::AlphaNum& a) {
   return a;
 }
 inline float PrintOneElement(const Eigen::half& h) {
   return static_cast<float>(h);
 }
+#endif  // TENSORFLOW_USE_SYCL
 
 // Print from left dim to right dim recursively.
 template <typename T>
