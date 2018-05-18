@@ -300,6 +300,9 @@ class Conv2DTest(test.TestCase):
 
   def _VerifyDilatedConvValues(self, tensor_in_sizes, filter_in_sizes, strides,
                                padding, dilations):
+    if "SYCL" in test_util.gpu_device_type():
+      return
+
     expected_results = []
     computed_results = []
     for data_format, use_gpu in GetTestConfigs():
