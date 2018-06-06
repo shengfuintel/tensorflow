@@ -110,14 +110,14 @@ struct ReverseSequenceKernelSYCL {
     Tlen* seq_lengths = ConvertToActualTypeSycl(Tlen, seq_lengths_acc_);
     T* input = ConvertToActualTypeSycl(T, input_acc_);
     T* output = ConvertToActualTypeSycl(T, output_acc_);
-    const auto coord = item.get_linear_id();
+    const auto coord = item.get_id(0);
     auto new_coord = coord;
     auto coord_seq_dim = get_coord_dim(coord, seq_dim_);
     auto coord_batch_dim = get_coord_dim(coord, batch_dim_);
     auto seq = seq_lengths[coord_batch_dim];
     if (coord_seq_dim < seq) {
       new_coord = 1;
-      for (int32 i = 1; i < int32(Dims) - 1; ++i)
+      for (int32 i = seq_dim_ + 1; i < int32(Dims); ++i)
         new_coord *= coord_dims_[i];
       new_coord = coord + (seq - 2 * coord_seq_dim - 1) * new_coord;
     }
@@ -155,7 +155,7 @@ struct ReverseSequence<SYCLDevice, T, Tlen, Dims> {
         output_buffer.template get_access<mode::discard_write>(cgh);
       ReverseSequenceKernelSYCL<T, Tlen, Dims> kernel(batch_dim, seq_dim,
           coord_dims, seq_lengths_acc, input_acc, output_acc);
-      cgh.parallel_for(output_buffer.get_range(), kernel);
+      cgh.parallel_for(cl::sycl::range<1>(input.size()), kernel);
     });
   }
 };
