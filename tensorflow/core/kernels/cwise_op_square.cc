@@ -40,6 +40,8 @@ REGISTER(UnaryOp, SYCL, "Square", functor::square, int64);
   REGISTER(UnaryOp, SYCL, "Square", functor::square, type)
 TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL);
 #undef REGISTER_SYCL
+
+// A special SYCL kernel for int32.
 REGISTER_KERNEL_BUILDER(Name("Square")
                             .Device(DEVICE_SYCL)
                             .HostMemory("x")

@@ -49,6 +49,8 @@ REGISTER(BinaryOp, SYCL, "Sub", functor::sub, int64);
 #define REGISTER_SYCL(type) REGISTER(BinaryOp, SYCL, "Sub", functor::sub, type)
 TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL);
 #undef REGISTER_SYCL
+
+// A special SYCL kernel for int32.
 REGISTER_KERNEL_BUILDER(Name("Sub")
                             .Device(DEVICE_SYCL)
                             .HostMemory("x")

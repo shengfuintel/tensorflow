@@ -63,7 +63,7 @@ BM_UNARY(cpu, Floor, double, DT_DOUBLE);
 #if GOOGLE_CUDA
 BM_UNARY(gpu, Floor, double, DT_DOUBLE);
 #endif  // GOOGLE_CUDA
-#ifdef TENSORFLOW_USE_SYCL
+#if defined(TENSORFLOW_USE_SYCL) && !defined(TENSORFLOW_SYCL_NO_DOUBLE)
 BM_UNARY(sycl, Floor, double, DT_DOUBLE);
 #endif  // TENSORFLOW_USE_SYCL
 
@@ -80,10 +80,16 @@ BM_UNARY(cpu, Rint, double, DT_DOUBLE);
 #if GOOGLE_CUDA
 BM_UNARY(gpu, Rint, double, DT_DOUBLE);
 #endif  // GOOGLE_CUDA
+#if defined(TENSORFLOW_USE_SYCL) && !defined(TENSORFLOW_SYCL_NO_DOUBLE)
+BM_UNARY(sycl, Rint, double, DT_DOUBLE);
+#endif  // TENSORFLOW_USE_SYCL
 BM_UNARY(cpu, Rint, float, DT_FLOAT);
 #if GOOGLE_CUDA
 BM_UNARY(gpu, Rint, float, DT_FLOAT);
 #endif  // GOOGLE_CUDA
+#ifdef TENSORFLOW_USE_SYCL
+BM_UNARY(sycl, Rint, float, DT_FLOAT);
+#endif  // TENSORFLOW_USE_SYCL
 
 // data func scalar.
 Graph* BinaryScalar(int num, const string& func) {
@@ -164,6 +170,9 @@ BM_BIAS_ADD_ALL(cpu, float, DT_FLOAT);
 #if GOOGLE_CUDA
 BM_BIAS_ADD_ALL(gpu, float, DT_FLOAT);
 #endif  // GOOGLE_CUDA
+#ifdef TENSORFLOW_USE_SYCL
+BM_BIAS_ADD_ALL(sycl, float, DT_FLOAT);
+#endif  // TENSORFLOW_USE_SYCL
 BM_BIAS_ADD_ALL(cpu, half, DT_HALF);
 #if GOOGLE_CUDA
 BM_BIAS_ADD_ALL(gpu, half, DT_HALF);
@@ -222,6 +231,9 @@ BM_BIAS_ADD_GRAD_ALL(cpu, NHWC, float, DT_FLOAT);
 #if GOOGLE_CUDA
 BM_BIAS_ADD_GRAD_ALL(gpu, NHWC, float, DT_FLOAT);
 #endif  // GOOGLE_CUDA
+#ifdef TENSORFLOW_USE_SYCL
+BM_BIAS_ADD_GRAD_ALL(sycl, NHWC, float, DT_FLOAT);
+#endif  // TENSORFLOW_USE_SYCL
 BM_BIAS_ADD_GRAD_ALL(cpu, NHWC, half, DT_HALF);
 #if GOOGLE_CUDA
 BM_BIAS_ADD_GRAD_ALL(gpu, NHWC, half, DT_HALF);
