@@ -347,6 +347,7 @@ class SegmentReductionSYCLOp : public OpKernel {
     Eigen::DSizes<Eigen::DenseIndex, 2> gap_slice_offset({0, 0});
     Eigen::DSizes<Eigen::DenseIndex, 2> out_slice_offset({0, 0});
     Eigen::DSizes<Eigen::DenseIndex, 2> out_slice_extents({1, num_col});
+    Eigen::DSizes<Eigen::DenseIndex, 1> out_slice_vec_shape(num_col);
 #if !defined(EIGEN_HAS_INDEX_LIST)
     Eigen::DSizes<Eigen::DenseIndex, 1> dims_to_reduce({0});
 #else
@@ -402,7 +403,8 @@ class SegmentReductionSYCLOp : public OpKernel {
       else {
         in_slice_extents[0] = end - start;
         auto in_slice = input_flat.slice(in_slice_offset, in_slice_extents);
-        out_slice.device(device) = in_slice.reduce(dims_to_reduce, Reducer());
+        out_slice.reshape(out_slice_vec_shape).device(device) =
+          in_slice.reduce(dims_to_reduce, Reducer());
       }
       if (end >= num_indices)
         break;
@@ -528,15 +530,17 @@ struct UnsortedSegmentFunctor<CPUDevice, T, Index, InitialValueF, ReductionF> {
   void operator()(OpKernelContext* ctx, const Index num_segments,
                   const TensorShape& segment_ids_shape,
                   typename TTypes<Index>::ConstFlat segment_ids,
-                  const Index data_size, const T* data,
+                  typename TTypes<T>::ConstFlat data_flat,
                   typename TTypes<T, 2>::Tensor output) {
     output.setConstant(InitialValueF()());
+    const Index data_size = data_flat.size();
     if (data_size == 0) {
       return;
     }
     const int64 N = segment_ids.dimension(0);
     ReductionF reduction;
-    auto data_flat = typename TTypes<T, 2>::ConstTensor(data, N, data_size / N);
+    const T* data = data_flat.data();
+    auto data_mat = typename TTypes<T>::ConstMatrix(data, N, data_size / N);
     for (int64 i = 0; i < N; ++i) {
       Index j = internal::SubtleMustCopy(segment_ids(i));
       if (j < 0) {
@@ -546,7 +550,7 @@ struct UnsortedSegmentFunctor<CPUDevice, T, Index, InitialValueF, ReductionF> {
                   errors::InvalidArgument(
                       "segment_ids", SliceDebugString(segment_ids_shape, i),
                       " = ", j, " is out of range [0, ", num_segments, ")"));
-      reduction(data_flat.template chip<0>(i), output.template chip<0>(j));
+      reduction(data_mat.template chip<0>(i), output.template chip<0>(j));
     }
   }
 };
@@ -589,54 +593,57 @@ struct ProdOp {
 
 #ifdef TENSORFLOW_USE_SYCL
 // reduction functors
-template <typename T>
 struct SumOpSycl {
-  void operator()(const SYCLDevice& d, const constMatrixChip<T> data,
-                  MatrixChip<T> output) {
+  template <typename TensorData, typename TensorOutput>
+  void operator()(const SYCLDevice& d, const TensorData data,
+                  TensorOutput output) {
     output.device(d) += data;
   }
 };
 
-template <typename T>
 struct MaxOpSycl {
-  void operator()(const SYCLDevice& d, const constMatrixChip<T> data,
-                  MatrixChip<T> output) {
+  template <typename TensorData, typename TensorOutput>
+  void operator()(const SYCLDevice& d, const TensorData data,
+                  TensorOutput output) {
     output.device(d) = data.cwiseMax(output);
   }
 };
 
-template <typename T>
 struct MinOpSycl {
-  void operator()(const SYCLDevice& d, const constMatrixChip<T> data,
-                  MatrixChip<T> output) {
+  template <typename TensorData, typename TensorOutput>
+  void operator()(const SYCLDevice& d, const TensorData data,
+                  TensorOutput output) {
     output.device(d) = data.cwiseMin(output);
   }
 };
 
-template <typename T>
 struct ProdOpSycl {
-  void operator()(const SYCLDevice& d, const constMatrixChip<T> data,
-                  MatrixChip<T> output) {
+  template <typename TensorData, typename TensorOutput>
+  void operator()(const SYCLDevice& d, const TensorData data,
+                  TensorOutput output) {
     output.device(d) = output * data;
   }
 };
 
 template <typename T, typename Index, typename InitialValueF,
           typename ReductionF>
-struct UnsortedSegmentFunctor<SYCLDevice, T, Index, InitialValueF, ReductionF> {
+struct UnsortedSegmentFunctor<SYCLDevice, T, Index, InitialValueF,
+                              ReductionF> {
   void operator()(OpKernelContext* ctx, const Index num_segments,
                   const TensorShape& segment_ids_shape,
                   typename TTypes<Index>::ConstFlat segment_ids,
-                  const Index data_size, const T* data,
+                  typename TTypes<T>::ConstFlat data_flat,
                   typename TTypes<T, 2>::Tensor output) {
     SYCLDevice d = ctx->eigen_device<SYCLDevice>();
     output.device(d) = output.constant(T(InitialValueF()()));
+    const Index data_size = data_flat.size();
     if (data_size == 0) {
       return;
     }
-    const int64 N = segment_ids.dimension(0);
+    const Index N = segment_ids.dimension(0);
     ReductionF reduction;
-    auto data_flat = typename TTypes<T, 2>::ConstTensor(data, N, data_size / N);
+    Eigen::DSizes<Index, 2> data_shape({N, data_size / N});
+    auto data_mat = data_flat.reshape(data_shape);
     for (int64 i = 0; i < N; ++i) {
       Index j = internal::SubtleMustCopy(segment_ids(i));
       if (j < 0) {
@@ -646,7 +653,7 @@ struct UnsortedSegmentFunctor<SYCLDevice, T, Index, InitialValueF, ReductionF> {
                   errors::InvalidArgument(
                       "segment_ids", SliceDebugString(segment_ids_shape, i),
                       " = ", j, " is out of range [0, ", num_segments, ")"));
-      reduction(d, data_flat.template chip<0>(i), output.template chip<0>(j));
+      reduction(d, data_mat.template chip<0>(i), output.template chip<0>(j));
     }
   }
 };
@@ -714,9 +721,9 @@ class UnsortedSegmentReductionOp : public OpKernel {
     Tensor* output = nullptr;
     OP_REQUIRES_OK(context, context->allocate_output(0, output_shape, &output));
     auto output_flat = output->flat_outer_dims<T>();
-    auto data_ptr = data.template flat<T>().data();
+    auto data_flat = data.template flat<T>();
     reduction_functor_(context, output_rows, segment_ids.shape(), segment_flat,
-                       data.NumElements(), data_ptr, output_flat);
+                       data_flat, output_flat);
   }
 
  protected:
@@ -851,16 +858,16 @@ TF_CALL_complex128(REGISTER_SUM_GPU_UNSORTED_KERNELS_ALL);
 #define REGISTER_REAL_SYCL_UNSORTED_KERNELS(type, index_type)                  \
   REGISTER_SYCL_KERNEL_UNSORTEDSEGMENT("UnsortedSegmentSum", type, index_type, \
                                       functor::Zero<type>,                     \
-                                      functor::SumOpSycl<type>);               \
+                                      functor::SumOpSycl);                     \
   REGISTER_SYCL_KERNEL_UNSORTEDSEGMENT("UnsortedSegmentMax", type, index_type, \
                                       functor::Lowest<type>,                   \
-                                      functor::MaxOpSycl<type>);               \
+                                      functor::MaxOpSycl);                     \
   REGISTER_SYCL_KERNEL_UNSORTEDSEGMENT("UnsortedSegmentMin", type, index_type, \
                                       functor::Highest<type>,                  \
-                                      functor::MinOpSycl<type>);               \
+                                      functor::MinOpSycl);                     \
   REGISTER_SYCL_KERNEL_UNSORTEDSEGMENT("UnsortedSegmentProd", type, index_type,\
                                       functor::One<type>,                      \
-                                      functor::ProdOpSycl<type>);
+                                      functor::ProdOpSycl);
 
 #define REGISTER_REAL_SYCL_UNSORTED_KERNELS_ALL(type) \
   REGISTER_REAL_SYCL_UNSORTED_KERNELS(type, int32);   \
