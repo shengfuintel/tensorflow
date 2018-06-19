@@ -29,6 +29,7 @@ limitations under the License.
 
 namespace tensorflow {
 typedef Eigen::ThreadPoolDevice CPUDevice;
+typedef Eigen::GpuDevice GPUDevice;
 #ifdef TENSORFLOW_USE_SYCL
 typedef Eigen::SyclDevice SYCLDevice;
 #endif  // TENSORFLOW_USE_SYCL
@@ -54,7 +55,7 @@ SliceIndex HandleCopies(OpKernelContext* ctx,
   }
   // Compute slice_bytes here so that static knowledge is available
   const size_t slice_bytes = slice_elems * sizeof(T);
-  auto worker_threads = ctx->device()->tensorflow_cpu_worker_threads();
+  auto* worker_threads = ctx->device()->tensorflow_cpu_worker_threads();
   mutex mu;
   // Store the value of invalidate index for printing error information, it's a
   // shared variable.
@@ -166,6 +167,16 @@ struct GatherFunctor<CPUDevice, T, Index> {
   }
 };
 
+template <typename Index>
+struct GatherFunctor<GPUDevice, Variant, Index> {
+  int64 operator()(OpKernelContext* ctx,
+                   typename TTypes<Variant, 3>::ConstTensor params,
+                   typename TTypes<Index>::ConstFlat indices,
+                   typename TTypes<Variant, 3>::Tensor out) {
+    return GatherFunctorCPU<Variant, Index>()(ctx, params, indices, out);
+  }
+};
+
 #ifdef TENSORFLOW_USE_SYCL
 // GatherOp is a very generic operation that extracts and copies a submatrix.
 // It can be broken down in several more optimal sub-cases which is what this version is doing.
@@ -226,6 +237,7 @@ struct HandleCopiesDetailsRows : public HandleCopiesDetails<T, Index> {
                           typename Parent::OutT o)
     : Parent(d, p, i, o) {
     this->slice_size = o.dimension(2);
+<<<<<<< HEAD
   }
 
   virtual inline void full_copy(TensorIndexT from) override {
@@ -343,6 +355,125 @@ HandleCopiesSYCL(OpKernelContext* ctx,
     host_indices.push_back(index);
   }
 
+=======
+  }
+
+  virtual inline void full_copy(TensorIndexT from) override {
+    this->device.memcpy(this->out.data(),
+                        this->params.data() + (from * this->slice_size),
+                        this->slice_size * sizeof(T));
+  }
+
+  virtual inline void adjacent_copy(TensorIndexT from, TensorIndexT to) override {
+    this->device.memcpy(this->out.data() + (from * this->slice_size),
+                        this->params.data() + (this->host_indices[from] * this->slice_size),
+                        (to - from) * this->slice_size * sizeof(T));
+  }
+
+  virtual inline void broadcast_copy(TensorIndexT from, TensorIndexT to) override {
+    // On some device, it may be more efficient to launch a chip and a
+    // broadcast instead of several memcpy
+    for (TensorIndexT i = from; i < to; ++i) {
+      this->single_copy(i);
+    }
+  }
+
+  virtual inline void single_copy(TensorIndexT from) override {
+    this->adjacent_copy(from, from + 1);
+  }
+};
+
+template <typename T, typename Index>
+struct HandleCopiesDetailsCols : public HandleCopiesDetails<T, Index> {
+  using Parent = HandleCopiesDetails<T, Index>;
+  using TensorIndexT = typename Parent::TensorIndexT;
+
+  HandleCopiesDetailsCols(const SYCLDevice& d,
+                          typename Parent::ParamsT p,
+                          typename Parent::IndicesT i,
+                          typename Parent::OutT o)
+    : Parent(d, p, i, o),
+      out_slice_offsets({0, 0, 0}),
+      params_slice_offsets({0, 0, 0}),
+      out_slice_extents({1, 1, 1}),
+      params_slice_extents({1, 1, 1}),
+      bcast_shape({1, 1, 1}) {
+      this->slice_size = o.dimension(0);
+      out_slice_extents[0] = this->slice_size;
+      params_slice_extents[0] = this->slice_size;
+      out_slice_extents[2] = o.dimension(2);
+      params_slice_extents[2] = o.dimension(2);
+    }
+
+  virtual inline void full_copy(TensorIndexT from) override {
+    this->out.template chip<1>(0).device(this->device) = this->params.template chip<1>(from);
+  }
+
+  virtual inline void adjacent_copy(TensorIndexT from, TensorIndexT to) override {
+    out_slice_offsets[1] = from;
+    params_slice_offsets[1] = this->host_indices[from];
+    out_slice_extents[1] = to - from;
+    params_slice_extents[1] = to - from;
+    this->out.slice(out_slice_offsets, out_slice_extents).device(this->device) =
+      this->params.slice(params_slice_offsets, params_slice_extents);
+  }
+
+  virtual inline void broadcast_copy(TensorIndexT from, TensorIndexT to) override {
+    out_slice_offsets[1] = from;
+    out_slice_extents[1] = to - from;
+    bcast_shape[1] = to - from;
+    this->out.template slice(out_slice_offsets, out_slice_extents).device(this->device) =
+      this->params.template chip<1>(this->host_indices[from]).broadcast(bcast_shape);
+  }
+
+  virtual inline void single_copy(TensorIndexT from) override {
+    this->out.template chip<1>(from).device(this->device) =
+      this->params.template chip<1>(this->host_indices[from]);
+  }
+
+ private:
+  Eigen::DSizes<TensorIndexT, 3> out_slice_offsets;
+  Eigen::DSizes<TensorIndexT, 3> params_slice_offsets;
+  Eigen::DSizes<TensorIndexT, 3> out_slice_extents;
+  Eigen::DSizes<TensorIndexT, 3> params_slice_extents;
+  Eigen::array<TensorIndexT, 3> bcast_shape;
+};
+
+template <typename HandleCopiesImplDetails>
+typename HandleCopiesImplDetails::TensorIndexT
+HandleCopiesSYCL(OpKernelContext* ctx,
+                 typename HandleCopiesImplDetails::ParamsT params,
+                 typename HandleCopiesImplDetails::IndicesT indices,
+                 typename HandleCopiesImplDetails::OutT out) {
+  HandleCopiesImplDetails impl_details(ctx->eigen_sycl_device(), params, indices, out);
+
+  using TensorIndexT = typename HandleCopiesImplDetails::TensorIndexT;
+  using IndicesDataT = typename HandleCopiesImplDetails::IndicesDataT;
+
+  // Handle simple case
+  if (impl_details.indices_size == 1) {
+    const IndicesDataT index = internal::SubtleMustCopy(indices(0));
+    if (!FastBoundsCheck(index, impl_details.limit))
+      return 0;
+    impl_details.full_copy(index);
+    return -1;
+  }
+
+  // Grab the index and check its validity.  An earlier version of the
+  // code checked it and then grabbed it from memory a second time, which
+  // was a security risk since it could have changed in between.
+  // Now copy the indices on the host.
+  auto& host_indices = impl_details.host_indices;
+  host_indices.reserve(impl_details.indices_size);
+  for (TensorIndexT i = 0; i < impl_details.indices_size; i++) {
+    const IndicesDataT index = internal::SubtleMustCopy(indices(i));
+    if (!FastBoundsCheck(index, impl_details.limit)) {
+      return i;
+    }
+    host_indices.push_back(index);
+  }
+
+>>>>>>> luke/dev/amd_gpu
   TensorIndexT copy_from = 0;  // bound included
   TensorIndexT copy_to = 1;    // bound excluded
   do {
