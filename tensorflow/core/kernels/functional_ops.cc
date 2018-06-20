@@ -329,13 +329,6 @@ class WhileOp : public AsyncOpKernel {
     }
   };
 };
-<<<<<<< HEAD
-REGISTER_KERNEL_BUILDER(Name("_While").Device(DEVICE_CPU), FunctionalWhile);
-REGISTER_KERNEL_BUILDER(Name("_While").Device(DEVICE_GPU), FunctionalWhile);
-#ifdef TENSORFLOW_USE_SYCL
-REGISTER_KERNEL_BUILDER(Name("_While").Device(DEVICE_SYCL), FunctionalWhile);
-#endif  // TENSORFLOW_USE_SYCL
-=======
 // TODO(drpng): remove these.
 REGISTER_KERNEL_BUILDER(Name("_While").Device(DEVICE_CPU), WhileOp);
 REGISTER_KERNEL_BUILDER(Name("_While").Device(DEVICE_GPU), WhileOp);
@@ -480,7 +473,6 @@ class ForOp : public AsyncOpKernel {
     }
   };
 };
->>>>>>> luke/dev/amd_gpu
 
 REGISTER_KERNEL_BUILDER(Name("For").Device(DEVICE_CPU), ForOp);
 REGISTER_KERNEL_BUILDER(Name("For")
@@ -497,5 +489,6 @@ REGISTER_KERNEL_BUILDER(Name("For")
                             .HostMemory("delta"),
                         ForOp);
 #endif  // TENSORFLOW_USE_SYCL
+
 }  // namespace
 }  // namespace tensorflow

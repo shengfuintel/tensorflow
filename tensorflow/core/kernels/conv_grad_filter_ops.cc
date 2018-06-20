@@ -117,7 +117,18 @@ struct LaunchConv2DBackpropFilterOp<CPUDevice, T> {
 #ifdef TF_USE_SYCLEIGEN
 template <typename T>
 struct LaunchConv2DBackpropFilterOp<SYCLDevice, T> {
-  void operator()(OpKernelContext* ctx, bool use_cudnn, bool cudnn_use_autotune,
+  void operator()(OpKernelContext* ctx, bool use_cudnn,
+                  bool cudnn_use_autotune,
+                  const Tensor& out_backprop, const Tensor& input,
+                  int row_dilatation, int col_dilatation,
+                  int row_stride, int col_stride, const Padding& padding,
+                  Tensor* filter_backprop, TensorFormat data_format) {
+    (*this)(ctx, use_cudnn, cudnn_use_autotune, out_backprop, input,
+            row_stride, col_stride, padding, filter_backprop, data_format);
+  }
+
+  void operator()(OpKernelContext* ctx, bool use_cudnn,
+                  bool cudnn_use_autotune,
                   const Tensor& out_backprop, const Tensor& input,
                   int row_stride, int col_stride, const Padding& padding,
                   Tensor* filter_backprop, TensorFormat data_format) {
@@ -1082,12 +1093,9 @@ REGISTER_KERNEL_BUILDER(Name("Conv2DBackpropFilter")
                               .HostMemory("filter_sizes"), \
                           Conv2DSlowBackpropFilterOp<SYCLDevice, T>);
 
-<<<<<<< HEAD
+//TODO(codeplay): Enable double and half later
 //TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL_KERNELS)
 TF_CALL_float(REGISTER_SYCL_KERNELS)
-=======
-TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL_KERNELS)
->>>>>>> luke/dev/amd_gpu
 #undef REGISTER_SYCL_KERNELS
 #endif  // TENSORFLOW_USE_SYCL
 

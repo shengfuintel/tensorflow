@@ -320,6 +320,10 @@ class MultinomialOp : public OpKernel {
       int num_samples_ceil_4 = (num_samples + 3) / 4 * 4;
       // CPU generates doubles = 2 samples per number.
       if (std::is_same<Device, CPUDevice>::value) num_samples_ceil_4 *= 2;
+      // SYCL generates doubles when possible = 2 samples per number.
+#if defined(TENSORFLOW_USE_SYCL) && !defined(TENSORFLOW_SYCL_NO_DOUBLE)
+      if (std::is_same<Device, SYCLDevice>::value) num_samples_ceil_4 *= 2;
+#endif
       auto rng =
           generator->ReserveRandomOutputs(batch_size * num_samples_ceil_4, 256);
       functor::MultinomialFunctor<Device, T, OutputType>()(
@@ -479,19 +483,19 @@ TF_CALL_double(REGISTER);
 #endif  // GOOGLE_CUDA
 
 #ifdef TENSORFLOW_USE_SYCL
-#define REGISTER(TYPE)                                                   \
-  REGISTER_KERNEL_BUILDER(Name("Multinomial")                            \
-                              .Device(DEVICE_SYCL)                       \
-                              .HostMemory("num_samples")                 \
-                              .TypeConstraint<TYPE>("T")                 \
-                              .TypeConstraint("output_dtype", DT_INT32), \
-                          MultinomialOp<SYCLDevice, TYPE, int32>)        \
-  REGISTER_KERNEL_BUILDER(Name("Multinomial")                            \
-                              .Device(DEVICE_SYCL)                       \
-                              .HostMemory("num_samples")                 \
-                              .TypeConstraint<TYPE>("T")                 \
-                              .TypeConstraint("output_dtype", DT_INT64), \
-                          MultinomialOp<SYCLDevice, TYPE, int64>)
+#define REGISTER(TYPE)                                                     \
+  REGISTER_KERNEL_BUILDER(Name("Multinomial")                              \
+                              .Device(DEVICE_SYCL)                         \
+                              .HostMemory("num_samples")                   \
+                              .TypeConstraint<TYPE>("T")                   \
+                              .TypeConstraint("output_dtype", DT_INT32),   \
+                          StatelessMultinomialOp<SYCLDevice, TYPE, int32>) \
+  REGISTER_KERNEL_BUILDER(Name("Multinomial")                              \
+                              .Device(DEVICE_SYCL)                         \
+                              .HostMemory("num_samples")                   \
+                              .TypeConstraint<TYPE>("T")                   \
+                              .TypeConstraint("output_dtype", DT_INT64),   \
+                          StatelessMultinomialOp<SYCLDevice, TYPE, int64>)
 TF_CALL_SYCL_NUMBER_TYPES(REGISTER);
 #undef REGISTER
 #endif  // TENSORFLOW_USE_SYCL

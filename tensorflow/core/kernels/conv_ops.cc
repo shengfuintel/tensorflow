@@ -142,8 +142,9 @@ struct LaunchConv2DOp<CPUDevice, T> {
 template <typename T>
 struct LaunchConv2DOp<SYCLDevice, T> {
   void operator()(OpKernelContext* ctx, bool use_cudnn, bool cudnn_use_autotune,
-                  const Tensor& input, const Tensor& filter, int row_stride,
-                  int col_stride, const Padding& padding, Tensor* output,
+                  const Tensor& input, const Tensor& filter, int row_dilation,
+                  int col_dilation, int row_stride, int col_stride,
+                  const Padding& padding, Tensor* output,
                   TensorFormat data_format) {
     if (data_format != FORMAT_NHWC) {
       ctx->SetStatus(
@@ -152,26 +153,8 @@ struct LaunchConv2DOp<SYCLDevice, T> {
       return;
     }
     LaunchGeneric<SYCLDevice, T>()(ctx, input, filter, row_stride, col_stride,
-                                   padding, output, data_format);
-  }
-};
-#endif  // TENSORFLOW_USE_SYCL
-
-#ifdef TF_USE_SYCLEIGEN
-template <typename T>
-struct LaunchConv2DOp<SYCLDevice, T> {
-  void operator()(OpKernelContext* ctx, bool use_cudnn, bool cudnn_use_autotune,
-                  const Tensor& input, const Tensor& filter, int row_stride,
-                  int col_stride, const Padding& padding, Tensor* output,
-                  TensorFormat data_format) {
-    if (data_format != FORMAT_NHWC) {
-      ctx->SetStatus(
-          errors::Unimplemented("Generic conv implementation only supports "
-                                "NHWC tensor format for now."));
-      return;
-    }
-    LaunchGeneric<SYCLDevice, T>()(ctx, input, filter, row_stride, col_stride,
-                                   padding, output, data_format);
+                                   row_dilation, col_dilation, padding, output,
+                                   data_format);
   }
 };
 #endif  // TF_USE_SYCLEIGEN

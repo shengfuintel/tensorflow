@@ -122,6 +122,15 @@ struct LaunchConv2DBackpropInputOp<CPUDevice, T> {
 #ifdef TF_USE_SYCLEIGEN
 template <typename T>
 struct LaunchConv2DBackpropInputOp<SYCLDevice, T> {
+  void operator()(OpKernelContext* ctx, bool use_cudnn,
+                  bool cudnn_use_autotune,
+                  const Tensor& out_backprop, const Tensor& filter,
+                  int row_dilatation, int col_dilatation,
+                  int row_stride, int col_stride, const Padding& padding,
+                  Tensor* in_backprop, TensorFormat data_format) {
+    (*this)(ctx, use_cudnn, cudnn_use_autotune, out_backprop, filter,
+            row_stride, col_stride, padding, in_backprop, data_format);
+  }
   void operator()(OpKernelContext* ctx, bool use_cudnn, bool cudnn_use_autotune,
                   const Tensor& out_backprop, const Tensor& filter,
                   int row_stride, int col_stride, const Padding& padding,

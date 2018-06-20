@@ -327,15 +327,6 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
       strip_prefix = "backports.weakref-1.0rc1/src",
       build_file = clean_dep("//third_party:backports_weakref.BUILD"),
   )
-  
-  native.new_http_archive(
-      name = "opencl_headers",
-      urls = [
-          "https://github.com/KhronosGroup/OpenCL-Headers/archive/f039db6764d52388658ef15c30b2237bbda49803.tar.gz",
-      ],
-      strip_prefix = "OpenCL-Headers-f039db6764d52388658ef15c30b2237bbda49803",
-      build_file = str(Label("//third_party:opencl-headers.BUILD")),
-  )
 
   native.new_http_archive(
       name = "opencl_headers",
