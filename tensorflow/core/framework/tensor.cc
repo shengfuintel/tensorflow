@@ -901,7 +901,8 @@ namespace {
 // usage and easy to change later. And there's the extra benefit of not
 // accessing an 'internal' namespace.
 #ifdef TENSORFLOW_USE_SYCL
-// TODO{lukeiwanski}: Remove once ComputeCpp 0.9 available
+// SYCL needs a workaround because Eigen::half has an implicit contructor
+// and cast from and to cl::sycl::half
 template<typename T>
 inline const T PrintOneElement(const T a) {
   return a;
