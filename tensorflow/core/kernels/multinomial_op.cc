@@ -484,15 +484,17 @@ TF_CALL_double(REGISTER);
 
 #ifdef TENSORFLOW_USE_SYCL
 #define REGISTER(TYPE)                                                     \
-  REGISTER_KERNEL_BUILDER(Name("Multinomial")                              \
+  REGISTER_KERNEL_BUILDER(Name("StatelessMultinomial")                     \
                               .Device(DEVICE_SYCL)                         \
                               .HostMemory("num_samples")                   \
+                              .HostMemory("seed")                          \
                               .TypeConstraint<TYPE>("T")                   \
                               .TypeConstraint("output_dtype", DT_INT32),   \
                           StatelessMultinomialOp<SYCLDevice, TYPE, int32>) \
-  REGISTER_KERNEL_BUILDER(Name("Multinomial")                              \
+  REGISTER_KERNEL_BUILDER(Name("StatelessMultinomial")                     \
                               .Device(DEVICE_SYCL)                         \
                               .HostMemory("num_samples")                   \
+                              .HostMemory("seed")                          \
                               .TypeConstraint<TYPE>("T")                   \
                               .TypeConstraint("output_dtype", DT_INT64),   \
                           StatelessMultinomialOp<SYCLDevice, TYPE, int64>)
