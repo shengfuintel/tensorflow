@@ -23,6 +23,10 @@ limitations under the License.
 #include "tensorflow/core/kernels/inplace_ops_functor.h"
 #include "tensorflow/core/lib/core/status.h"
 
+#ifdef TENSORFLOW_USE_SYCL
+#include "tensorflow/core/common_runtime/sycl/sycl_util.h"
+#endif  // TENSORFLOW_USE_SYCL
+
 namespace tensorflow {
 typedef Eigen::ThreadPoolDevice CPUDevice;
 #ifdef TENSORFLOW_USE_SYCL
@@ -326,18 +330,14 @@ void DoInplaceStringUpdateOp(const CPUDevice& d, const Tensor& i,
   }
 }
 
-template <typename Device>
-Status DoInplaceBase(const Device& device, InplaceOpType op, const Tensor& i,
+template <>
+Status DoInplace(const CPUDevice& device, InplaceOpType op, const Tensor& i,
                  const Tensor& v, Tensor* y) {
   CHECK_EQ(v.dtype(), y->dtype());
   if (op == I_UPDATE) {
     if (v.dtype() == DT_STRING) {
-#ifndef TENSORFLOW_USE_SYCL
       DoInplaceStringUpdateOp(device, i, v, y);
       return Status::OK();
-#else
-      return errors::Unimplemented("DT_STRING not allowed on SYCL device");
-#endif  // TENSORFLOW_USE_SYCL
     } else if (v.dtype() == DT_BOOL) {
       DoInplaceOp<bool>(device, op, i, v, y);
       return Status::OK();
@@ -356,17 +356,23 @@ Status DoInplaceBase(const Device& device, InplaceOpType op, const Tensor& i,
   return Status::OK();
 }
 
-template <>
-Status DoInplace(const CPUDevice& device, InplaceOpType op, const Tensor& i,
-                 const Tensor& v, Tensor* y) {
-  return DoInplaceBase(device, op, i, v, y);
-}
-
 #ifdef TENSORFLOW_USE_SYCL
 template <>
 Status DoInplace(const SYCLDevice& device, InplaceOpType op, const Tensor& i,
                  const Tensor& v, Tensor* y) {
-  return DoInplaceBase(device, op, i, v, y);
+  CHECK_EQ(v.dtype(), y->dtype());
+  switch (v.dtype()) {
+#define CASE(type)                          \
+  case DataTypeToEnum<type>::value:         \
+    DoInplaceOp<type>(device, op, i, v, y); \
+    break;
+    TF_CALL_SYCL_NUMBER_TYPES(CASE);
+    TF_CALL_int64(CASE);
+#undef CASE
+    default:
+      return errors::InvalidArgument("Unsupported data type: ", v.dtype());
+  }
+  return Status::OK();
 }
 #endif  // TENSORFLOW_USE_SYCL
 
@@ -420,8 +426,8 @@ namespace functor {
 
 typedef Eigen::ThreadPoolDevice CPUDevice;
 
-template <typename Device>
-Status DoCopyBase(const Device& device, const Tensor& x, Tensor* y) {
+template <>
+Status DoCopy(const CPUDevice& device, const Tensor& x, Tensor* y) {
   CHECK_EQ(x.dtype(), y->dtype());
   switch (x.dtype()) {
 #define CASE(type)                                   \
@@ -438,15 +444,12 @@ Status DoCopyBase(const Device& device, const Tensor& x, Tensor* y) {
   return Status::OK();
 }
 
-template <>
-Status DoCopy(const CPUDevice& device, const Tensor& x, Tensor* y) {
-  return DoCopyBase(device, x, y);
-}
-
 #ifdef TENSORFLOW_USE_SYCL
 template <>
 Status DoCopy(const SYCLDevice& device, const Tensor& x, Tensor* y) {
-  return DoCopyBase(device, x, y);
+  CHECK_EQ(x.dtype(), y->dtype());
+  SYCLmemcpy(device, x, y);
+  return Status::OK();
 }
 #endif  // TENSORFLOW_USE_SYCL
 
