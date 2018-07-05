@@ -30,6 +30,9 @@ using thread::ThreadPool;
 
 typedef Eigen::ThreadPoolDevice CPUDevice;
 typedef Eigen::GpuDevice GPUDevice;
+#ifdef TENSORFLOW_USE_SYCL
+typedef Eigen::SyclDevice SYCLDevice;
+#endif  // TENSORFLOW_USE_SYCL
 
 namespace functor {
 
@@ -84,6 +87,85 @@ struct BincountFunctor<CPUDevice, T> {
   }
 };
 
+#ifdef TENSORFLOW_USE_SYCL
+
+namespace {
+//Generate a matrix which values are the index of the columns
+template <typename T>
+struct ColumnsIndicesGenerator {
+  inline T operator()(const Eigen::array<Eigen::DenseIndex, 2>& idx) const {
+    return idx[1];
+  }
+};
+} // namespace
+
+template <typename T>
+struct BincountFunctor<SYCLDevice, T> {
+  static Status Compute(OpKernelContext* context,
+                        const typename TTypes<int32, 1>::ConstTensor& arr,
+                        const typename TTypes<T, 1>::ConstTensor& weights,
+                        typename TTypes<T, 1>::Tensor& output) {
+
+    const SYCLDevice& d = context->eigen_device<SYCLDevice>();
+
+    auto input_size = arr.size();
+    auto output_size = output.size();
+
+    if (output_size == 0)
+      return Status::OK();
+
+    if (input_size == 0)
+    {
+      output.device(d) = output.constant(T(0));
+      return Status::OK();
+    }
+
+    // Checks if all values in arr are positive
+    Tensor all_nonneg_t;
+    TF_RETURN_IF_ERROR(context->allocate_temp(
+        DT_BOOL, TensorShape({}), &all_nonneg_t, AllocatorAttributes()));
+    auto all_nonneg = all_nonneg_t.scalar<bool>();
+    all_nonneg.device(d) = (arr >= 0).all();
+    bool all_nonneg_host = false;
+    d.memcpyDeviceToHost(&all_nonneg_host, all_nonneg.data(), sizeof(bool));
+    if (!all_nonneg_host) {
+      return errors::InvalidArgument("Input arr must be non-negative!");
+    }
+
+#if !defined(EIGEN_HAS_INDEX_LIST)
+    Eigen::DSizes<Eigen::Index, 2> input_size_by_one({input_size, 1});
+    Eigen::DSizes<Eigen::Index, 2> one_by_output_size({1, output_size});
+    Eigen::DSizes<Eigen::Index, 1> sum_dim(0);
+#else
+    Eigen::IndexList<Eigen::Index, Eigen::type2index<1>> input_size_by_one;
+    input_size_by_one.set(0, input_size);
+    Eigen::IndexList<Eigen::type2index<1>, Eigen::Index> one_by_output_size;
+    one_by_output_size.set(1, output_size);
+    Eigen::IndexList<Eigen::type2index<0>> sum_dim;
+#endif
+
+    auto bcast_input = arr.reshape(input_size_by_one).
+                           broadcast(one_by_output_size);
+    auto index_matrix = bcast_input.generate(ColumnsIndicesGenerator<int32>());
+
+    auto result_mat = (bcast_input == index_matrix).template cast<T>();
+
+    if (weights.size()) {
+      auto bcast_weights = weights.reshape(input_size_by_one).
+                                   broadcast(one_by_output_size);
+      output.device(d) = (result_mat * bcast_weights).sum(sum_dim);
+    }
+    else {
+      auto bcast_weights = index_matrix.constant(1);
+      output.device(d) = (result_mat * bcast_weights).sum(sum_dim);
+    }
+
+    return Status::OK();
+  }
+};
+
+#endif //TENSORFLOW_USE_SYCL
+
 }  // namespace functor
 
 template <typename Device, typename T>
@@ -134,5 +216,20 @@ TF_CALL_float(REGISTER_KERNELS);
 #undef REGISTER_KERNELS
 
 #endif  // GOOGLE_CUDA
+
+#ifdef TENSORFLOW_USE_SYCL
+
+#define REGISTER_KERNELS(type)                            \
+  REGISTER_KERNEL_BUILDER(Name("Bincount")                \
+                              .Device(DEVICE_SYCL)        \
+                              .HostMemory("size")         \
+                              .TypeConstraint<type>("T"), \
+                          BincountOp<SYCLDevice, type>)
+
+TF_CALL_int32(REGISTER_KERNELS);
+TF_CALL_float(REGISTER_KERNELS);
+#undef REGISTER_KERNELS
+
+#endif  // TENSORFLOW_USE_SYCL
 
 }  // end namespace tensorflow
