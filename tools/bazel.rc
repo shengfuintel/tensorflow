@@ -55,6 +55,8 @@ build:sycl_asan --copt -DGPR_NO_DIRECT_SYSCALLS --linkopt -fPIC
 build:sycl_asan --linkopt -fsanitize=address
 build:sycl_asan --copt -DDISABLE_SKINNY=1
 
+# This configuration is for a cross-build by default.
+# For a native build on ARM, specify --cpu=arm on the command line.
 build:sycl_arm --crosstool_top=@local_config_sycl//crosstool:toolchain
 build:sycl_arm --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
 build:sycl_arm --define=using_sycl=true --define=using_trisycl=false
