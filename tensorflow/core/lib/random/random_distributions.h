@@ -696,12 +696,11 @@ PHILOX_DEVICE_INLINE bfloat16 Uint16ToGfloat16(uint16 x) {
   const uint16 exp = static_cast<uint16>(127);
   const uint16 val = (exp << 7) | man;
 
-  bfloat16 result;
-  memcpy(&result, &val, sizeof(val));
-  // The mantissa has an implicit leading 1, so the above code creates a value
+  // The mantissa has an implicit leading 1, so the cast below creates a value
   // in [1, 2). The minus will not cause a rounding that makes the result 1.
   // Instead it will just be close to 1.
-  return result - bfloat16(1.0);
+  auto result = reinterpret_cast<const bfloat16*>(&val);
+  return *result - bfloat16(1.0);
 }
 
 // Helper function to convert an 32-bit integer to a float between [0..1).
@@ -717,9 +716,8 @@ PHILOX_DEVICE_INLINE float Uint32ToFloat(uint32 x) {
   const uint32 val = (exp << 23) | man;
 
   // Assumes that endian-ness is same for float and uint32.
-  float result;
-  memcpy(&result, &val, sizeof(val));
-  return result - 1.0f;
+  auto result = reinterpret_cast<const float*>(&val);
+  return *result - 1.0f;
 }
 
 // Helper function to convert two 32-bit integers to a double between [0..1).
@@ -736,9 +734,8 @@ PHILOX_DEVICE_INLINE double Uint64ToDouble(uint32 x0, uint32 x1) {
   const uint64 exp = static_cast<uint64>(1023);
   const uint64 val = (exp << 52) | man;
   // Assumes that endian-ness is same for double and uint64.
-  double result;
-  memcpy(&result, &val, sizeof(val));
-  return result - 1.0;
+  auto result = reinterpret_cast<const double*>(&val);
+  return *result - 1.0;
 }
 
 }  // namespace random
