@@ -158,6 +158,9 @@ def GetTestConfigs():
 class Conv2DTest(test.TestCase):
 
   def _DtypesToTest(self, use_gpu):
+    #TODO(codeplay): enable double for convolution later
+    if use_gpu and "sycl" in test_util.gpu_device_name().lower():
+      return [dtypes.float32]
     if use_gpu and not test_util.CudaSupportsHalfMatMulAndConv():
       return [dtypes.float32, dtypes.float64]
     else:
