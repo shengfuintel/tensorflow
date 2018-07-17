@@ -118,11 +118,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
   tf_http_archive(
       name = "eigen_archive",
       urls = [
-          "http://mirror.bazel.build/bitbucket.org/mehdi_goli/opencl/get/494754f23b11.tar.gz",
-          "https://bitbucket.org/mehdi_goli/opencl/get/494754f23b11.tar.gz",
+          "http://mirror.bazel.build/bitbucket.org/mehdi_goli/opencl/get/756ddc9a1263.tar.gz",
+          "https://bitbucket.org/mehdi_goli/opencl/get/756ddc9a1263.tar.gz",
       ],
-      sha256 = "0796a6e058db3c748d4733663c509e6406c15ac7884543801963dd21564ae002",
-      strip_prefix = "mehdi_goli-opencl-494754f23b11",
+      sha256 = "df69de92be9e17dad805ccc5bfc014e5371cb2eeeee47ad3cc904902c4877056",
+      strip_prefix = "mehdi_goli-opencl-756ddc9a1263",
       build_file = str(Label("//third_party:eigen.BUILD")),
       patch_file = clean_dep("//third_party:eigen_fix_cuda_compilation.patch")
   )
