@@ -39,9 +39,7 @@ bool IsSYCLEnabled() {
 
 bool CudaSupportsHalfMatMulAndConv() {
 #if GOOGLE_CUDA
-  // NOTE: We check compile-time and not runtime, since the check for
-  // whether we include the fp16 kernels or not is compile-time.
-  return CUDA_VERSION >= 7050;
+  return true;
 #else
   return false;
 #endif

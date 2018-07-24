@@ -19,6 +19,11 @@ namespace tensorflow {
 REGISTER2(BinaryOp, CPU, "Igamma", functor::igamma, float, double);
 REGISTER2(BinaryOp, CPU, "Igammac", functor::igammac, float, double);
 
+#if GOOGLE_CUDA
+REGISTER2(BinaryOp, GPU, "Igamma", functor::igamma, float, double);
+REGISTER2(BinaryOp, GPU, "Igammac", functor::igammac, float, double);
+#endif
+
 #ifdef TENSORFLOW_USE_SYCL
 #define REGISTER_SYCL(type) \
   REGISTER(BinaryOp, SYCL, "Igamma", functor::igamma, type) \
@@ -26,4 +31,5 @@ REGISTER2(BinaryOp, CPU, "Igammac", functor::igammac, float, double);
 TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL);
 #undef REGISTER_SYCL
 #endif  // TENSORFLOW_USE_SYCL
+
 }  // namespace tensorflow

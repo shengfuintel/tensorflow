@@ -46,7 +46,7 @@ class ClusterTest(test.TestCase):
       op_perfs, run_time, step_stats = grappler_cluster.MeasureCosts(
           grappler_item)
       self.assertTrue(run_time > 0)
-      self.assertEqual(len(op_perfs), 8)
+      self.assertEqual(len(op_perfs), 4)
       self.assertTrue(step_stats.dev_stats)
 
   def testNoDetailedStats(self):
@@ -130,7 +130,7 @@ class ClusterTest(test.TestCase):
         disable_detailed_stats=False, disable_timeline=False) as gcluster:
       op_perfs, run_time, step_stats = gcluster.MeasureCosts(grappler_item)
       self.assertTrue(run_time > 0)
-      self.assertEqual(len(op_perfs), 8)
+      self.assertEqual(len(op_perfs), 4)
       self.assertTrue(step_stats.dev_stats)
 
   def testAvailableOps(self):
