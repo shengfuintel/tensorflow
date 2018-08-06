@@ -36,6 +36,7 @@ limitations under the License.
 #include <map>
 #include <memory>
 #include <utility>
+#include "unsupported/Eigen/CXX11/src/Tensor/TensorSyclPreDefined.h"
 #endif
 #include <cmath>
 #include <cstddef>
