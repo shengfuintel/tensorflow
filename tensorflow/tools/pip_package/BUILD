@@ -179,9 +179,10 @@ sh_binary(
         "//tensorflow:windows_msvc": [":simple_console_for_windows"],
         "//conditions:default": COMMON_PIP_DEPS + [
             ":simple_console",
-            "//tensorflow/contrib/lite/python:interpreter_test_data",
-            "//tensorflow/contrib/lite/python:tflite_convert",
-            "//tensorflow/contrib/lite/toco/python:toco_from_protos",
+#TODO(codeplay) enable contrib/lite once it compiles with the latest Eigen
+#"//tensorflow/contrib/lite/python:interpreter_test_data",
+#"//tensorflow/contrib/lite/python:tflite_convert",
+#"//tensorflow/contrib/lite/toco/python:toco_from_protos",
         ],
     }) + if_mkl(["//third_party/mkl:intel_binary_blob"]) + if_tensorrt([
         "//tensorflow/contrib/tensorrt:init_py",

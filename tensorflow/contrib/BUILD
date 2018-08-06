@@ -124,7 +124,8 @@ py_library(
         "//conditions:default": [],
     }) + if_not_windows([
         "//tensorflow/contrib/ffmpeg:ffmpeg_ops_py",
-        "//tensorflow/contrib/lite/python:lite",  # unix dependency, need to fix code
+#TODO(codeplay) enable contrib/lite once it compiles with the latest Eigen
+#"//tensorflow/contrib/lite/python:lite",  # unix dependency, need to fix code
     ]),
 )
 
