@@ -24,6 +24,10 @@ load(
     "if_mkl",
     "if_mkl_lnx_x64"
 )
+load(
+    "@local_config_sycl//sycl:build_defs.bzl",
+    "if_sycl",
+)
 
 load(
     "//third_party/acl:build_defs.bzl",

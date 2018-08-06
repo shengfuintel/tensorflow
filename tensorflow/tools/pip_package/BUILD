@@ -12,6 +12,7 @@ load(
 load("//third_party/mkl:build_defs.bzl", "if_mkl")
 load("//third_party/acl:build_defs.bzl", "if_acl")
 load("//tensorflow:tensorflow.bzl", "if_cuda")
+load("//tensorflow:tensorflow.bzl", "if_sycl")
 load("@local_config_tensorrt//:build_defs.bzl", "if_tensorrt")
 load("//tensorflow/core:platform/default/build_config_root.bzl", "tf_additional_license_deps")
 
@@ -39,6 +40,8 @@ transitive_hdrs(
         "//third_party/eigen3",
     ] + if_cuda([
         "@local_config_cuda//cuda:cuda_headers",
+    ]) + if_sycl([
+        "@local_config_sycl//sycl:sycl_headers",
     ]),
 )
 
