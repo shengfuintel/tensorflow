@@ -118,11 +118,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
   tf_http_archive(
       name = "eigen_archive",
       urls = [
-          "http://mirror.bazel.build/bitbucket.org/mehdi_goli/opencl/get/756ddc9a1263.tar.gz",
-          "https://bitbucket.org/mehdi_goli/opencl/get/756ddc9a1263.tar.gz",
+          "http://mirror.bazel.build/bitbucket.org/codeplaysoftware/eigen/get/2b6643d4f3b9.tar.gz",
+          "https://bitbucket.org/codeplaysoftware/eigen/get/2b6643d4f3b9.tar.gz",
       ],
-      sha256 = "df69de92be9e17dad805ccc5bfc014e5371cb2eeeee47ad3cc904902c4877056",
-      strip_prefix = "mehdi_goli-opencl-756ddc9a1263",
+      sha256 = "c047acab9b982e66b522f38a6ae94edc3d41a2b0e2d94e3ae627d4a3de763422",
+      strip_prefix = "codeplaysoftware-eigen-2b6643d4f3b9",
       build_file = clean_dep("//third_party:eigen.BUILD"),
   )
 
