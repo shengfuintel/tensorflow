@@ -1113,9 +1113,7 @@ template struct LaunchConv2DBackpropFilterOp<GPUDevice, double>;
                               .HostMemory("filter_sizes"), \
                           Conv2DSlowBackpropFilterOp<SYCLDevice, T>);
 
-//TODO(codeplay): Enable double and half later
-//TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL_KERNELS)
-TF_CALL_float(REGISTER_SYCL_KERNELS)
+TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL_KERNELS)
 #undef REGISTER_SYCL_KERNELS
 #endif  // TENSORFLOW_USE_SYCL
 

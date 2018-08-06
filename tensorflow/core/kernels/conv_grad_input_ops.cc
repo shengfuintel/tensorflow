@@ -1183,8 +1183,7 @@ template struct LaunchConv2DBackpropInputOp<GPUDevice, double>;
                               .HostMemory("input_sizes"), \
                           Conv2DSlowBackpropInputOp<SYCLDevice, T>);
 
-//TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL_KERNELS);
-TF_CALL_float(REGISTER_SYCL_KERNELS)
+TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL_KERNELS);
 #undef REGISTER_SYCL_KERNELS
 #endif  // TENSORFLOW_USE_SYCL
 }  // namespace tensorflow

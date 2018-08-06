@@ -88,9 +88,9 @@ Status SYCLDevice::MaybeCopyTensorToGPU(
         },
         std::move(done), std::placeholders::_1);
 
-    port::Tracing::ScopedAnnotation annotation("MakeTensorFromProto");
+    tracing::ScopedAnnotation annotation("MakeTensorFromProto");
     device_context_->CopyCPUTensorToDevice(&from, this, copy,
-                                               std::move(wrapped_done));
+                                           std::move(wrapped_done));
     return Status::OK();
   }
 }
