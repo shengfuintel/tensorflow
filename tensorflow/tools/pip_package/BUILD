@@ -41,7 +41,7 @@ transitive_hdrs(
     ] + if_cuda([
         "@local_config_cuda//cuda:cuda_headers",
     ]) + if_sycl([
-        "@local_config_sycl//sycl:sycl_headers",
+        "@local_config_sycl//sycl:sycl",
     ]),
 )
 

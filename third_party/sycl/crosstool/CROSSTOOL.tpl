@@ -86,6 +86,9 @@ toolchain {
   compiler_flag: "-fno-omit-frame-pointer"
   compiler_flag: "-Wall"
 
+# ComputeCpp must be linked for the target configuration only
+  linker_flag: "-lComputeCpp"
+  linker_flag: "-L%{COMPUTECPP_ROOT_DIR}%/lib/"
   linker_flag: "-lstdc++"
   linker_flag: "-B/usr/bin/"
   linker_flag: "-no-canonical-prefixes"
@@ -188,6 +191,9 @@ toolchain {
   compiler_flag: "-fno-omit-frame-pointer"
   compiler_flag: "-Wall"
 
+# ComputeCpp must be linked for the target configuration only
+  linker_flag: "-lComputeCpp"
+  linker_flag: "-L%{COMPUTECPP_ROOT_DIR}%/lib/"
   linker_flag: "-target"
   linker_flag: "%{CROSS_TARGET}%"
   linker_flag: "--gcc-toolchain=%{CROSS_COMPILER_PATH}%"

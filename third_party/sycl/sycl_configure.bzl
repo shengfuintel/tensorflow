@@ -168,7 +168,6 @@ def _create_dummy_repository(repository_ctx):
   _tpl(repository_ctx, "sycl:build_defs.bzl")
   _tpl(repository_ctx, "sycl:BUILD")
   _file(repository_ctx, "sycl:LICENSE.text")
-  _tpl(repository_ctx, "sycl:platform.bzl")
 
   # Create dummy files for the SYCL toolkit since they are still required by
   # tensorflow/sycl/platform/default/build_config:sycl.
@@ -201,7 +200,6 @@ def _sycl_autoconf_impl(repository_ctx):
     # copy template files
     _tpl(repository_ctx, "sycl:build_defs.bzl")
     _tpl(repository_ctx, "sycl:BUILD")
-    _tpl(repository_ctx, "sycl:platform.bzl")
     _tpl(repository_ctx, "crosstool:BUILD")
     _file(repository_ctx, "sycl:LICENSE.text")
 

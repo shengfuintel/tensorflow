@@ -24,8 +24,6 @@ load(
     "tf_kernel_tests_linkstatic",
 )
 
-load("@local_config_sycl//sycl:build_defs.bzl", "if_sycl")
-
 cc_library(
     name = "all_ops",
     deps = [
@@ -237,9 +235,7 @@ tf_custom_op_library(
     ],
     deps = [
         "//tensorflow/core/kernels:eigen_helpers",
-    ] + if_sycl([
-        "@local_config_sycl//sycl:syclrt",
-    ]),
+    ],
 )
 
 tf_gen_op_wrapper_py(
@@ -263,9 +259,7 @@ tf_custom_op_library(
     ],
     deps = [
         "//tensorflow/core/kernels:eigen_helpers",
-    ] + if_sycl([
-        "@local_config_sycl//sycl:syclrt",
-    ]),
+    ],
 )
 
 tf_gen_op_wrapper_py(
