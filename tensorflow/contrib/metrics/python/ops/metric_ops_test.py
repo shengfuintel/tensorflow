@@ -3445,8 +3445,8 @@ class PrecisionAtRecallTest(test.TestCase):
 
     with self.test_session() as sess:
       sess.run(variables.local_variables_initializer())
-      self.assertEqual(1, sess.run(update_op))
-      self.assertEqual(1, precision.eval())
+      self.assertAlmostEqual(1, sess.run(update_op))
+      self.assertAlmostEqual(1, precision.eval())
 
   def testAllIncorrect(self):
     inputs = np.random.randint(0, 2, size=(100, 1))

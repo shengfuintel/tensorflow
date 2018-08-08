@@ -72,7 +72,9 @@ class PrintModelAnalysisTest(test.TestCase):
 
   def testSelectEverythingDetail(self):
     ops.reset_default_graph()
-    dev = '/device:GPU:0' if test.is_gpu_available() else '/device:CPU:0'
+    dev = '/device:CPU:0'
+    if test.is_gpu_available():
+      dev = '/device:{}:0'.format(test_util.gpu_device_type())
     outfile = os.path.join(test.get_temp_dir(), 'dump')
     opts = (builder(builder.trainable_variables_parameter())
             .with_file_output(outfile)

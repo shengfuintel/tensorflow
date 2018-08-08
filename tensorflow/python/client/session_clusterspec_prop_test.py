@@ -199,7 +199,7 @@ class SessionClusterSpecPropagationTest(test_util.TensorFlowTestCase):
         sum1 = input1 + input2
 
       if test.is_gpu_available():
-        device_str = '/job:worker/task:0/device:GPU:0'
+        device_str = '/job:worker/task:0/device:{}:0'.format(test_util.gpu_device_type())
       else:
         device_str = '/job:worker/task:0/cpu:1'
       with ops.device(device_str):

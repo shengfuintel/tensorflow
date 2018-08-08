@@ -312,11 +312,9 @@ class BaseLinearRegressorEvaluationTest(object):
     # Loss per example is 3**2 = 9.
     # Training loss is the weighted sum over batch = 9 + 2*9 = 27
     # average loss is the weighted average = 9 + 2*9 / (1 + 2) = 9
-    self.assertDictEqual({
-        metric_keys.MetricKeys.LOSS: 27.,
-        metric_keys.MetricKeys.LOSS_MEAN: 9.,
-        ops.GraphKeys.GLOBAL_STEP: 100
-    }, eval_metrics)
+    self.assertAlmostEqual(eval_metrics[metric_keys.MetricKeys.LOSS], 27., 3)
+    self.assertAlmostEqual(eval_metrics[metric_keys.MetricKeys.LOSS_MEAN], 9., 3)
+    self.assertEqual(100, eval_metrics[ops.GraphKeys.GLOBAL_STEP])
 
   def test_evaluation_for_multi_dimensions(self):
     x_dim = 3
