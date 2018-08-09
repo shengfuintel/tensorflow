@@ -834,13 +834,53 @@ REGISTER_KERNEL_BUILDER(Name("ResourceScatterUpdate")
 #endif  // GOOGLE_CUDA
 
 #ifdef TENSORFLOW_USE_SYCL
-#define REGISTER_SCATTER_ARITHEMTIC_SYCL(type) \
-  REGISTER_SCATTER_ARITHMETIC(type, SYCL);
+#define REGISTER_SCATTER_KERNEL_INDEX_SYCL(type, index_type, name, op) \
+  REGISTER_KERNEL_BUILDER(                                             \
+      Name(name)                                                       \
+          .Device(DEVICE_SYCL)                                         \
+          .HostMemory("indices")                                       \
+          .HostMemory("resource")                                      \
+          .TypeConstraint<type>("dtype")                               \
+          .TypeConstraint<index_type>("Tindices"),                     \
+      ResourceScatterUpdateOp<SYCLDevice, type, index_type, op>)
 
-#define REGISTER_SCATTER_UPDATE_SYCL(type) REGISTER_SCATTER_UPDATE(type, SYCL);
+#define REGISTER_SCATTER_KERNEL_SYCL(type, name, op)         \
+  REGISTER_SCATTER_KERNEL_INDEX_SYCL(type, int32, name, op); \
+  REGISTER_SCATTER_KERNEL_INDEX_SYCL(type, int64, name, op);
 
-TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SCATTER_ARITHEMTIC_SYCL);
-#undef REGISTER_SCATTER_UPDATE_SYCL
+#define REGISTER_SCATTER_ARITHMETIC_SYCL(type)                \
+  REGISTER_SCATTER_KERNEL_SYCL(type, "ResourceScatterAdd",    \
+                          scatter_op::UpdateOp::ADD);         \
+  REGISTER_SCATTER_KERNEL_SYCL(type, "ResourceScatterSub",    \
+                          scatter_op::UpdateOp::SUB);         \
+  REGISTER_SCATTER_KERNEL_SYCL(type, "ResourceScatterMul",    \
+                          scatter_op::UpdateOp::MUL);         \
+  REGISTER_SCATTER_KERNEL_SYCL(type, "ResourceScatterDiv",    \
+                          scatter_op::UpdateOp::DIV);         \
+  REGISTER_SCATTER_KERNEL_SYCL(type, "ResourceScatterUpdate", \
+                          scatter_op::UpdateOp::ASSIGN);
+#define REGISTER_SCATTER_MINMAX_SYCL(type)                 \
+  REGISTER_SCATTER_KERNEL_SYCL(type, "ResourceScatterMin", \
+                          scatter_op::UpdateOp::MIN);      \
+  REGISTER_SCATTER_KERNEL_SYCL(type, "ResourceScatterMax", \
+                          scatter_op::UpdateOp::MAX);
+
+TF_CALL_SYCL_NUMBER_TYPES_NO_HALF(REGISTER_SCATTER_ARITHMETIC_SYCL);
+TF_CALL_SYCL_NUMBER_TYPES_NO_HALF(REGISTER_SCATTER_MINMAX_SYCL);
+
+#undef REGISTER_SCATTER_ARITHMETIC_SYCL
+#undef REGISTER_SCATTER_MINMAX_SYCL
+#undef REGISTER_SCATTER_KERNEL_SYCL
+#undef REGISTER_SCATTER_KERNEL_INDEX_SYCL
+
+REGISTER_KERNEL_BUILDER(Name("ResourceScatterUpdate")
+                            .Device(DEVICE_SYCL)
+                            .HostMemory("resource")
+                            .HostMemory("indices")
+                            .TypeConstraint<bool>("dtype")
+                            .TypeConstraint<int32>("Tindices"),
+                        ResourceScatterUpdateOp<SYCLDevice, bool, int32,
+                                                scatter_op::UpdateOp::ASSIGN>)
 #endif  // TENSORFLOW_USE_SYCL
 
 #undef REGISTER_SCATTER_ARITHMETIC
