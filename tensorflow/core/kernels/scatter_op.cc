@@ -236,7 +236,7 @@ TF_CALL_GPU_NUMBER_TYPES_NO_HALF(REGISTER_SCATTER_UPDATE_GPU);
 #define REGISTER_SCATTER_MINMAX_SYCL_SPEC(type, dev)      \
   REGISTER_SCATTER_KERNEL_SYCL(type, dev, "ScatterMin",   \
                                scatter_op::UpdateOp::MIN);\
-  REGISTER_SCATTER_KERNEL_SYCL(type, dev, "ScatterMin",   \
+  REGISTER_SCATTER_KERNEL_SYCL(type, dev, "ScatterMax",   \
                                scatter_op::UpdateOp::MAX);
 
 #define REGISTER_SCATTER_ARITHMETIC_SYCL(type) \

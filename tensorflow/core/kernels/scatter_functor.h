@@ -135,7 +135,7 @@ struct AssignSYCL<scatter_op::UpdateOp::ASSIGN> {
   }
   template <typename Device, typename Params, typename Update>
   static void RunScalar(Device d, Params p, Update u) {
-    p.device(d) = p.constant(u);
+    p.device(d) = u;
   }
 };
 
@@ -158,12 +158,20 @@ struct AssignSYCL<scatter_op::UpdateOp::SUB> {
   static void Run(Device d, Params p, Update u) {
     p.device(d) = p - u;
   }
+  template <typename Device, typename Params, typename Update>
+  static void RunScalar(Device d, Params p, Update u) {
+    p.device(d) = p + (-u).template cast<typename Update::Scalar>();
+  }
 };
 
 template <>
 struct AssignSYCL<scatter_op::UpdateOp::MUL> {
   template <typename Device, typename Params, typename Update>
   static void Run(Device d, Params p, Update u) {
+    p.device(d) = p * u;
+  }
+  template <typename Device, typename Params, typename Update>
+  static void RunScalar(Device d, Params p, Update u) {
     p.device(d) = p * u;
   }
 };
@@ -174,6 +182,10 @@ struct AssignSYCL<scatter_op::UpdateOp::DIV> {
   static void Run(Device d, Params p, Update u) {
     p.device(d) = p / u;
   }
+  template <typename Device, typename Params, typename Update>
+  static void RunScalar(Device d, Params p, Update u) {
+    p.device(d) = p / u;
+  }
 };
 
 template <>
@@ -182,12 +194,20 @@ struct AssignSYCL<scatter_op::UpdateOp::MIN> {
   static void Run(Device d, Params p, Update u) {
     p.device(d) = p.cwiseMin(u);
   }
+  template <typename Device, typename Params, typename Update>
+  static void RunScalar(Device d, Params p, Update u) {
+    p.device(d) = p.cwiseMin(u);
+  }
 };
 
 template <>
 struct AssignSYCL<scatter_op::UpdateOp::MAX> {
   template <typename Device, typename Params, typename Update>
   static void Run(Device d, Params p, Update u) {
+    p.device(d) = p.cwiseMax(u);
+  }
+  template <typename Device, typename Params, typename Update>
+  static void RunScalar(Device d, Params p, Update u) {
     p.device(d) = p.cwiseMax(u);
   }
 };
@@ -433,6 +453,14 @@ struct ScatterScalarFunctorBase<SYCLDevice, T, Index, op> {
     // indices and params sizes were validated in DoCompute().
     const Index N = static_cast<Index>(indices.size());
     const Index limit = static_cast<Index>(params.dimension(0));
+#if !defined(EIGEN_HAS_INDEX_LIST)
+    Eigen::DSizes<Eigen::DenseIndex, 1> reshape_dims(1);
+    Eigen::DSizes<Eigen::DenseIndex, 1> bcast_dims(params.dimension(1));
+#else
+    Eigen::IndexList<Eigen::type2index<1>> reshape_dims;
+    Eigen::IndexList<Eigen::DenseIndex> bcast_dims;
+    bcast_dims.set(0, params.dimension(1));
+#endif
     for (Index i = 0; i < N; i++) {
       // Grab the index and check its validity.  Do this carefully,
       // to avoid checking the value and grabbing it again from
@@ -441,7 +469,8 @@ struct ScatterScalarFunctorBase<SYCLDevice, T, Index, op> {
       if (!FastBoundsCheck(index, limit)) return i;
       // Broadcast update to params[index]
       scatter_op::internal::AssignSYCL<op>::RunScalar(
-          d, params.template chip<0>(index), update);
+          d, params.template chip<0>(index),
+          update.reshape(reshape_dims).broadcast(bcast_dims));
     }
     return -1;
   }
@@ -478,28 +507,8 @@ struct ScatterScalarFunctor<CPUDevice, T, Index, op>
 
 #ifdef TENSORFLOW_USE_SYCL
 template <typename T, typename Index, scatter_op::UpdateOp op>
-struct ScatterScalarFunctorSYCL {
-  Index operator()(OpKernelContext* c, const SYCLDevice& d,
-                   typename TTypes<T>::Matrix params,
-                   const typename TTypes<T>::ConstScalar update,
-                   typename TTypes<Index>::ConstFlat indices) {
-    // indices and params sizes were validated in DoCompute().
-    const Index N = static_cast<Index>(indices.size());
-    const Index limit = static_cast<Index>(params.dimension(0));
-    for (Index i = 0; i < N; i++) {
-      const Index index = ::tensorflow::internal::SubtleMustCopy(indices(i));
-      if (!FastBoundsCheck(index, limit)) return i;
-      // Broadcast update to params[index]
-      scatter_op::internal::AssignSYCL<scatter_op::UpdateOp::ASSIGN>::RunScalar(
-          d, params.template chip<0>(index), update());
-    }
-    return -1;
-  }
-};
-
-template <typename T, typename Index, scatter_op::UpdateOp op>
 struct ScatterScalarFunctor<SYCLDevice, T, Index, op>
-    : ScatterScalarFunctorSYCL<T, Index, op> {};
+    : ScatterScalarFunctorBase<SYCLDevice, T, Index, op> {};
 
 #endif  // TENSORFLOW_USE_SYCL
 
