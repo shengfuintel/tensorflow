@@ -621,6 +621,13 @@ struct FillPhiloxRandomKernel {
                                      : 1> generate_samples_;
 };
 
+template <class D, bool V>
+constexpr size_t FillPhiloxRandomKernel<D, V>::kReservedSamplesPerOutput;
+template <class D, bool V>
+constexpr size_t FillPhiloxRandomKernel<D, V>::kGroupSize;
+template <class D, bool V>
+constexpr size_t FillPhiloxRandomKernel<D, V>::kGeneratorSkipPerOutputGroup;
+
 template <typename T>
 class FillRandomKernel;
 // Partial specialization for SYCL to fill the entire region with randoms
