@@ -86,7 +86,10 @@ template <typename T>
 struct DenseUpdate<SYCLDevice, T, ASSIGN> {
   void operator()(const SYCLDevice& d, typename TTypes<T>::Flat params,
                   typename TTypes<T>::ConstFlat update) {
-    params.device(d) = update;
+    // Copying a buffer to itself will cause an error.
+    // The check isn't done in Eigen because it would add a cost for the normal case
+    if (params.data() != update.data())
+      params.device(d) = update;
   }
 };
 #endif  // TENSORFLOW_USE_SYCL
