@@ -287,7 +287,7 @@ OpLevelCostEstimator::OpLevelCostEstimator() {
                       {"Square", EIGEN_COST(scalar_square_op<float>)},
                       {"Tanh", EIGEN_COST(scalar_tanh_op<float>)},
                       {"Relu", EIGEN_COST(scalar_max_op<float>)},
-                      {"Sigmoid", EIGEN_COST(scalar_sigmoid_op<float>)},
+                      {"Sigmoid", EIGEN_COST(scalar_logistic_op<float>)},
                       {"Sign", EIGEN_COST(scalar_sign_op<float>)},
                       {"Sin", EIGEN_COST(scalar_sin_op<float>)},
                       {"Tan", EIGEN_COST(scalar_tan_op<float>)},
