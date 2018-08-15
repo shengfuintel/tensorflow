@@ -49,6 +49,7 @@ int GetNumAvailableGPUs() {
   }
 #endif  // GOOGLE_CUDA
 
+//TODO(codeplay): temporary fix, this would fail if SYCL and CUDA are both enabled
 #ifdef TENSORFLOW_USE_SYCL
   num_eligible_gpus = 1;
 #endif  // TENSORFLOW_USE_SYCL
@@ -67,6 +68,7 @@ int64 AvailableGPUMemory(int gpu_id) {
   CHECK(se->DeviceMemoryUsage(&available_memory, &total_memory));
 
   return available_memory;
+//TODO(codeplay): temporary fix, this would fail if SYCL and CUDA are both enabled
 #elif TENSORFLOW_USE_SYCL
   return 1024 * 1024;
 #else

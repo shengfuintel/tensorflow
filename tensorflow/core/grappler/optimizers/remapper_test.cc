@@ -70,7 +70,13 @@ TEST_F(RemapperTest, FusedBatchNormNCHW) {
   ops::FusedBatchNorm::Attrs attr;
   attr = attr.IsTraining(false);
   attr = attr.DataFormat("NCHW");
-  ops::FusedBatchNorm bn(s.WithOpName("batch_norm").WithDevice("/device:GPU:0"),
+  //TODO(codeplay): temporary fix, this would fail if SYCL and CUDA are both enabled
+#ifdef TENSORFLOW_USE_SYCL
+  std::string device_name("SYCL:0");
+#else
+  std::string device_name("GPU:0");
+#endif
+  ops::FusedBatchNorm bn(s.WithOpName("batch_norm").WithDevice("/device:" + device_name),
                          x, scale, offset, mean, variance, attr);
 
   GrapplerItem item;
