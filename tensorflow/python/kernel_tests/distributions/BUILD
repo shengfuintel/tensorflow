@@ -108,7 +108,8 @@ cuda_py_test(
 
 cuda_py_test(
     name = "dirichlet_test",
-    size = "small",
+#TODO(codeplay): bazel doesn't let us configure the size field
+    size = "large",
     srcs = ["dirichlet_test.py"],
     additional_deps = [
         "//tensorflow/python/ops/distributions",
