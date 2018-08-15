@@ -30,7 +30,7 @@ bool IsGoogleCudaEnabled() {
 }
 
 bool IsSYCLEnabled() {
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
   return true;
 #else
   return false;

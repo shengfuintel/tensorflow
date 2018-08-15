@@ -61,7 +61,7 @@ TF_CALL_POD_TYPES(REGISTER_KERNEL);
 #undef REGISTER_KERNEL
 #endif
 
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 typedef Eigen::SyclDevice SyclDevice;
 #define REGISTER_SYCL_KERNEL(TYPE)                                    \
   REGISTER_KERNEL_BUILDER(                                            \

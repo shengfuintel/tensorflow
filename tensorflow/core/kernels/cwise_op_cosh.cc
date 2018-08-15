@@ -23,7 +23,7 @@ REGISTER4(UnaryOp, CPU, "Cosh", functor::cosh, float, double, complex64,
 REGISTER2(UnaryOp, GPU, "Cosh", functor::cosh, float, double);
 #endif
 
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 #define REGISTER_SYCL_KERNEL(TYPE) \
   REGISTER(UnaryOp, SYCL, "Cosh", functor::cosh, TYPE)
 TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL_KERNEL);

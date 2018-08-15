@@ -333,7 +333,7 @@ REGISTER_KERNEL_BUILDER(Name("FunctionBufferingResource")
                             .HostMemory("string_arg")
                             .HostMemory("target_device"),
                         FunctionBufferResourceHandleOp);
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 REGISTER_KERNEL_BUILDER(Name("FunctionBufferingResource")
                             .Device(DEVICE_SYCL)
                             .HostMemory("resource")
@@ -394,7 +394,7 @@ REGISTER_KERNEL_BUILDER(Name("FunctionBufferingResourceGetNext")
                             .Device(DEVICE_GPU)
                             .HostMemory("function_buffer_resource"),
                         FunctionBufferingResourceGetNextOp);
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 REGISTER_KERNEL_BUILDER(Name("FunctionBufferingResourceGetNext")
                             .Device(DEVICE_SYCL)
                             .HostMemory("function_buffer_resource"),
@@ -431,7 +431,7 @@ REGISTER_KERNEL_BUILDER(Name("FunctionBufferingResourceReset")
                             .Device(DEVICE_GPU)
                             .HostMemory("function_buffer_resource"),
                         FunctionBufferingResourceResetOp);
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 REGISTER_KERNEL_BUILDER(Name("FunctionBufferingResourceReset")
                             .Device(DEVICE_SYCL)
                             .HostMemory("function_buffer_resource"),

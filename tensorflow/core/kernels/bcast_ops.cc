@@ -145,7 +145,7 @@ REGISTER_KERNEL_BUILDER(Name("BroadcastArgs")
                             .HostMemory("r0"),
                         BCastArgsOp<int64>);
 
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 REGISTER_KERNEL_BUILDER(Name("BroadcastArgs")
                             .Device(DEVICE_SYCL)
                             .TypeConstraint<int32>("T")
@@ -195,7 +195,7 @@ REGISTER_KERNEL_BUILDER(Name("BroadcastGradientArgs")
                             .HostMemory("r1"),
                         BCastGradArgsOp<int64>);
 
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 REGISTER_KERNEL_BUILDER(Name("BroadcastGradientArgs")
                             .Device(DEVICE_SYCL)
                             .TypeConstraint<int32>("T")

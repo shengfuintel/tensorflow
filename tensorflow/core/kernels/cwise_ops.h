@@ -838,7 +838,7 @@ struct scalar_atan2_op {
   operator()(const Scalar& y, const Scalar& x) const {
 #if GOOGLE_CUDA
     return ::atan2(y, x);
-#elif TENSORFLOW_USE_SYCL
+#elif defined(TENSORFLOW_USE_SYCL)
     return cl::sycl::atan2(y, x);
 #else
     return std::atan2(y, x);

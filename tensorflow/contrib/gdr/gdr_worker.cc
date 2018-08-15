@@ -117,7 +117,7 @@ void GdrWorker::GrpcRecvTensorAsync(CallOptions* opts,
           } else {
             // Non-DMA cases.
             if (src_dev->tensorflow_gpu_device_info() && (!on_host)) {
-#if GOOGLE_CUDA || TENSORFLOW_USE_SYCL
+#if GOOGLE_CUDA || defined(TENSORFLOW_USE_SYCL)
               DeviceContext* send_dev_context = send_args.device_context;
               AllocatorAttributes alloc_attrs;
               alloc_attrs.set_gpu_compatible(true);

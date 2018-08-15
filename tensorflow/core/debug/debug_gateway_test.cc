@@ -893,7 +893,7 @@ class SessionDebugGPUSwitchTest : public ::testing::Test {
 //TODO(codeplay): temporary fix, this would fail if SYCL and CUDA are both enabled
 #ifdef GOOGLE_CUDA
     const string kDeviceName = "/job:localhost/replica:0/task:0/device:GPU:0";
-#elif TENSORFLOW_USE_SYCL
+#elif defined(TENSORFLOW_USE_SYCL)
     const string kDeviceName = "/job:localhost/replica:0/task:0/device:SYCL:0";
 #endif
 

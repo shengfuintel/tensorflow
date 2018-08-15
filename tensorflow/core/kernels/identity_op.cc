@@ -45,7 +45,7 @@ REGISTER_KERNEL_BUILDER(Name("DebugGradientIdentity").Device(DEVICE_CPU),
 REGISTER_KERNEL_BUILDER(Name("DebugGradientRefIdentity").Device(DEVICE_CPU),
                         IdentityOp);
 
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 #define REGISTER_SYCL_KERNEL(type)                                           \
   REGISTER_KERNEL_BUILDER(                                                   \
       Name("Identity").Device(DEVICE_SYCL).TypeConstraint<type>("T"),        \

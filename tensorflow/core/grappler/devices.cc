@@ -69,7 +69,7 @@ int64 AvailableGPUMemory(int gpu_id) {
 
   return available_memory;
 //TODO(codeplay): temporary fix, this would fail if SYCL and CUDA are both enabled
-#elif TENSORFLOW_USE_SYCL
+#elif defined(TENSORFLOW_USE_SYCL)
   return 1024 * 1024;
 #else
   return 0;
