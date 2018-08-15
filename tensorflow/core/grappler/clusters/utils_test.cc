@@ -27,6 +27,7 @@ namespace {
 
 TEST(UtilsTest, GetLocalGPUInfo) {
   GpuIdManager::TestOnlyReset();
+//TODO(codeplay): temporary fix, this would fail if SYCL and CUDA are both enabled
 #if GOOGLE_CUDA
   LOG(INFO) << "CUDA is enabled.";
   DeviceProperties properties;
@@ -43,19 +44,14 @@ TEST(UtilsTest, GetLocalGPUInfo) {
   LOG(INFO) << "CUDA is not enabled.";
   DeviceProperties properties;
 
-  properties = GetLocalGPUInfo(CudaGpuId(0));
-#ifdef TENSORFLOW_USE_SYCL
-  EXPECT_EQ("SYCL", properties.type());
-#else
-  EXPECT_EQ("GPU", properties.type());
-#endif  // TENSORFLOW_USE_SYCL
-
+  //TODO(codeplay): Improve GetLocalGPUInfo for SYCL
+  // Invalid SYCL GPU ID.
   properties = GetLocalGPUInfo(CudaGpuId(100));
-#ifdef TENSORFLOW_USE_SYCL
   EXPECT_EQ("SYCL", properties.type());
-#else
-  EXPECT_EQ("GPU", properties.type());
-#endif  // TENSORFLOW_USE_SYCL
+
+  // Succeed when a valid CUDA GPU id was inserted.
+  properties = GetLocalGPUInfo(CudaGpuId(0));
+  EXPECT_EQ("SYCL", properties.type());
 #endif
 }
 
@@ -77,6 +73,7 @@ TEST(UtilsTest, GetDeviceInfo) {
   device.type = "GPU";
   device.has_id = false;
   properties = GetDeviceInfo(device);
+//TODO(codeplay): temporary fix, this would fail if SYCL and CUDA are both enabled
 #ifdef TENSORFLOW_USE_SYCL
   EXPECT_EQ("SYCL", properties.type());
 #else

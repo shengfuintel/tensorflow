@@ -884,6 +884,7 @@ size_t Tensor::AllocatedBytes() const {
 
 bool Tensor::CanUseDMA() const {
   // NOTE: SYCL fakes DMA
+//TODO(codeplay): temporary fix, this would fail if SYCL and CUDA are both enabled
 #ifdef TENSORFLOW_USE_SYCL
   return true;
 #else

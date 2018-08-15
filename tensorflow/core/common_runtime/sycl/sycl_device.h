@@ -207,7 +207,7 @@ class SYCLDevice : public LocalDevice {
         device_context_(ctx) {
     gpu_device_info_ = new GpuDeviceInfo;
     gpu_device_info_->default_context = device_context_;
-    // TODO {lukeiwanski}: Improve to support multiple GPU devices
+    // TODO(codeplay): Improve to support multiple GPU devices
     gpu_device_info_->gpu_id = 0;
 
     set_tensorflow_gpu_device_info(gpu_device_info_);

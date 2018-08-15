@@ -109,6 +109,7 @@ DeviceProperties GetLocalGPUInfo(CudaGpuId cuda_gpu_id) {
   (*device.mutable_environment())["cuda"] = strings::StrCat(CUDA_VERSION);
   (*device.mutable_environment())["cudnn"] = strings::StrCat(CUDNN_VERSION);
 #endif
+//TODO(codeplay): temporary fix, this would fail if SYCL and CUDA are both enabled
 #ifdef TENSORFLOW_USE_SYCL
   device.set_type("SYCL");
   device.set_vendor("SYCL Device");

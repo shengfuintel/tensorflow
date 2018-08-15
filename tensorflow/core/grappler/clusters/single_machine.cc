@@ -52,6 +52,7 @@ SingleMachine::SingleMachine(int timeout_s, int num_cpu_cores, int num_gpus)
   }
 #endif  // GOOGLE_CUDA
 
+//TODO(codeplay): temporary fix, this would fail if SYCL and CUDA are both enabled
 #ifdef TENSORFLOW_USE_SYCL
 if (num_gpus > 0) {
   (*options_.config.mutable_device_count())["SYCL"] = num_gpus;
