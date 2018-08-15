@@ -761,7 +761,7 @@ TEST_F(MathGradTest, Pow) {
   }
 }
 
-// TODO{lukeiwanski}: Implement Complex Pow for SYCL
+// TODO(codeplay): Implement Complex Pow for SYCL
 #ifndef TENSORFLOW_USE_SYCL
 TEST_F(MathGradTest, ComplexPow) {
   auto x = test::AsTensor<complex64>({0.f, 2.f, -2.f}, TensorShape({3}));
@@ -943,8 +943,7 @@ TEST_F(MathGradTest, MatMul_11) {
   test::ExpectClose(dy, MatMul(dz, true, x, true));
 }
 
-// TODO{lukeiwanski}: Implement BatchMatMul for SYCL
-#ifndef TENSORFLOW_USE_SYCL
+// TODO(codeplay): Implement BatchMatMul for SYCL
 TEST_F(MathGradTest, BatchMatMul_00) {
   auto x = test::AsTensor<float>({1.f, 2.f, 3.f, 4.f, 5.f, 6.f},
                                  TensorShape({1, 2, 3}));
@@ -992,7 +991,6 @@ TEST_F(MathGradTest, BatchMatMul_11) {
   test::ExpectClose(dx, BatchMatMul(y, true, dz, true));
   test::ExpectClose(dy, BatchMatMul(dz, true, x, true));
 }
-#endif  // TENSORFLOW_USE_SYCL
 
 TEST_F(MathGradTest, Sum_dim0) {
   auto x = test::AsTensor<float>({-3.f, -2.f, -1.f, 1.f, 2.f, 3.f},

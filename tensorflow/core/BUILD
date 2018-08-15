@@ -4275,7 +4275,11 @@ tf_cc_test(
 
 tf_cc_test(
     name = "ops_math_grad_test",
+    #TODO(codeplay): This test recompiles OpenCL kernels multiple times
+    # hence is very slow for SYCL.
+    # Bazel doesn't let us configure the size or timeout fields.
     size = "small",
+    timeout = "long",
     srcs = ["ops/math_grad_test.cc"],
     linkstatic = tf_kernel_tests_linkstatic(),
     tags = ["no_gpu"],
