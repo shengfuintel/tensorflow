@@ -943,7 +943,6 @@ TEST_F(MathGradTest, MatMul_11) {
   test::ExpectClose(dy, MatMul(dz, true, x, true));
 }
 
-// TODO(codeplay): Implement BatchMatMul for SYCL
 TEST_F(MathGradTest, BatchMatMul_00) {
   auto x = test::AsTensor<float>({1.f, 2.f, 3.f, 4.f, 5.f, 6.f},
                                  TensorShape({1, 2, 3}));
