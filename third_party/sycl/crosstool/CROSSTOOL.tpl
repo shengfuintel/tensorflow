@@ -110,8 +110,6 @@ toolchain {
     compiler_flag: "-g0"
     compiler_flag: "-O2"
     compiler_flag: "-DNDEBUG"
-    compiler_flag: "-ffunction-sections"
-    compiler_flag: "-fdata-sections"
     linker_flag: "-Wl,--gc-sections"
   }
 
@@ -214,8 +212,6 @@ toolchain {
     compiler_flag: "-g0"
     compiler_flag: "-O2"
     compiler_flag: "-DNDEBUG"
-    compiler_flag: "-ffunction-sections"
-    compiler_flag: "-fdata-sections"
     linker_flag: "-Wl,--gc-sections"
   }
 
