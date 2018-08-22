@@ -205,6 +205,8 @@ toolchain {
   compilation_mode_flags {
     mode: DBG
     compiler_flag: "-g"
+    # Seems to be needed for ARM only
+    compiler_flag: "-mcmodel=large"
   }
 
   compilation_mode_flags {
