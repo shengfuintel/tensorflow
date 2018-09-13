@@ -595,18 +595,19 @@ struct FillPhiloxRandomKernel {
     kReservedSamplesPerOutput / PhiloxRandom::kResultElementCount;
 
   FillPhiloxRandomKernel(write_accessor& data, random::PhiloxRandom& gen,
-                         Distribution& dist)
-      : data_(data), gen_(gen), dist_(dist) {}
+                         Distribution& dist, size_t size)
+      : data_(data), gen_(gen), dist_(dist), size_(size) {}
 
   void operator()(cl::sycl::nd_item<1> item) {
     const size_t item_id = item.get_global_id(0);
     const size_t offset = item_id * kGroupSize;
+    if (offset > size_)
+      return;
 
-    const size_t size = data_.get_size() / sizeof(T);
     T* data = ConvertToActualTypeSycl(T, data_) + offset;
 
     auto samples = generate_samples_(item_id, dist_, gen_);
-    const size_t nb_fill = std::min(kGroupSize, size - offset);
+    const size_t nb_fill = std::min(kGroupSize, size_ - offset);
     for (size_t i = 0; i < nb_fill; ++i) {
       data[i] = samples[i];
     }
@@ -616,6 +617,7 @@ struct FillPhiloxRandomKernel {
   write_accessor data_;
   random::PhiloxRandom gen_;
   Distribution dist_;
+  size_t size_;
   GenerateSamples<T, Distribution, VariableSamplesPerOutput
                                      ? kGeneratorSkipPerOutputGroup
                                      : 1> generate_samples_;
@@ -642,7 +644,8 @@ void FillPhiloxRandom<SYCLDevice, Distribution>::operator()(
 
   const size_t nb_items = (size + Distribution::kResultElementCount - 1) /
                            Distribution::kResultElementCount;
-  const size_t group_size = device.getNearestPowerOfTwoWorkGroupSize();
+  const size_t group_size = std::min(nb_items,
+      device.getNearestPowerOfTwoWorkGroupSize());
   const size_t group_count = (nb_items + group_size - 1) / group_size;
 
   auto buffer = device.get_sycl_buffer(data);
@@ -655,7 +658,7 @@ void FillPhiloxRandom<SYCLDevice, Distribution>::operator()(
 
     FillPhiloxRandomKernel<Distribution,
                            Distribution::kVariableSamplesPerOutput>
-      task(access, gen, dist);
+      task(access, gen, dist, size);
     cgh.parallel_for<class FillRandomKernel<Distribution>>(nd_rng, task);
   });
 }
