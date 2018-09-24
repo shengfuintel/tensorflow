@@ -15,6 +15,8 @@ limitations under the License.
 
 // See docs in ../ops/array_ops.cc.
 
+#include "tensorflow/core/lib/bfloat16/bfloat16.h"
+
 #include <math.h>
 #include <algorithm>
 #include <numeric>
@@ -32,6 +34,9 @@ namespace tensorflow {
 
 typedef Eigen::ThreadPoolDevice CPUDevice;
 typedef Eigen::GpuDevice GPUDevice;
+#ifdef TENSORFLOW_USE_SYCL
+typedef Eigen::SyclDevice SYCLDevice;
+#endif // TENSORFLOW_USE_SYCL
 
 #if GOOGLE_CUDA
 template <typename T>
@@ -47,6 +52,8 @@ template <typename Device, typename T>
 class CheckNumericsOp;
 
 // Partial specialization for CPU
+// TODO(jeff,rmlarsen): We should make this variant be an AsyncOpKernel, as
+// was done for the GPU case below.
 template <typename T>
 class CheckNumericsOp<CPUDevice, T> : public OpKernel {
  public:
@@ -67,27 +74,31 @@ class CheckNumericsOp<CPUDevice, T> : public OpKernel {
     int fp_props =
         std::accumulate(data, data + size, 0, [](const int& x, const T& y) {
           int result = x;
-          if (Eigen::numext::isinf(y)) {
+          if (TF_PREDICT_TRUE(Eigen::numext::isfinite(y))) {
+            // Do nothing: common case
+          } else if (Eigen::numext::isinf(y)) {
             result |= kInfBit;
           } else if (Eigen::numext::isnan(y)) {
             result |= kNaNBit;
           }
           return result;
         });
-    string status;
-    if ((fp_props & kInfBit) && (fp_props & kNaNBit)) {
-      status = "Inf and NaN";
-    } else {
-      if (fp_props & kInfBit) {
-        status = "Inf";
+    if (fp_props != 0) {
+      string status;
+      if ((fp_props & kInfBit) && (fp_props & kNaNBit)) {
+        status = "Inf and NaN";
+      } else {
+        if (fp_props & kInfBit) {
+          status = "Inf";
+        }
+        if (fp_props & kNaNBit) {
+          status = "NaN";
+        }
       }
-      if (fp_props & kNaNBit) {
-        status = "NaN";
+      if (!status.empty()) {
+        context->SetStatus(errors::InvalidArgument(message_, " : Tensor had ",
+                                                   status, " values"));
       }
-    }
-    if (!status.empty()) {
-      context->SetStatus(errors::InvalidArgument(message_, " : Tensor had ",
-                                                 status, " values"));
     }
   }
 
@@ -131,7 +142,7 @@ class CheckNumericsOp<GPUDevice, T> : public AsyncOpKernel {
     OP_REQUIRES_ASYNC(context, stream != nullptr,
                       errors::Internal("No GPU stream available."), done);
 
-    perftools::gputools::DeviceMemoryBase abnormal_detected_ptr(
+    se::DeviceMemoryBase abnormal_detected_ptr(
         abnormal_detected.flat<int>().data(),
         abnormal_detected.flat<int>().size());
     stream->ThenMemset32(&abnormal_detected_ptr, 0,
@@ -166,8 +177,8 @@ class CheckNumericsOp<GPUDevice, T> : public AsyncOpKernel {
     TensorReference abnormal_detected_ref(abnormal_detected);
     auto check_cb = [this, stream, abnormal_detected_ref,
                      abnormal_detected_host, context, done]() {
-      ::perftools::gputools::cuda::ScopedActivateExecutorContext
-          scoped_activation{stream->parent()};
+      se::cuda::ScopedActivateExecutorContext scoped_activation{
+          stream->parent()};
       auto abnormal_detected_host_flat = abnormal_detected_host.flat<int>();
       int is_nan = abnormal_detected_host_flat(0);
       int is_inf = abnormal_detected_host_flat(1);
@@ -206,6 +217,110 @@ class CheckNumericsOp<GPUDevice, T> : public AsyncOpKernel {
 };
 #endif  // GOOGLE_CUDA
 
+#ifdef TENSORFLOW_USE_SYCL
+template <typename T>
+struct CheckNumericsKernel {
+  using write_accessor =
+    cl::sycl::accessor<uint8_t, 1, cl::sycl::access::mode::discard_write,
+                       cl::sycl::access::target::global_buffer>;
+  using read_accessor =
+    cl::sycl::accessor<uint8_t, 1, cl::sycl::access::mode::read,
+                       cl::sycl::access::target::global_buffer>;
+
+  CheckNumericsKernel(const read_accessor in, write_accessor out, Eigen::DenseIndex size)
+    : in_(in)
+    , out_(out)
+    , size_(size)
+  {}
+  void operator()(cl::sycl::nd_item<1> item)
+  {
+    const T* input = ConvertToActualTypeSycl(T, in_);
+    bool* output = ConvertToActualTypeSycl(bool, out_);
+
+    const auto curr_idx = item.get_global_id(0);
+    // Check that kernel is not accessing value out of bound
+    if (curr_idx >= size_)
+      return;
+    const auto curr_val = input[curr_idx];
+    //There is no need to sync output as writing to it is always to true
+    if (Eigen::numext::isinf(curr_val))
+      output[0] = true;
+    else if (Eigen::numext::isnan(curr_val))
+      output[1] = true;
+  }
+private:
+  const read_accessor in_;
+  write_accessor out_;
+  const Eigen::DenseIndex size_;
+};
+
+template <typename T>
+class CheckNumericsOp<SYCLDevice, T> : public OpKernel {
+ public:
+  explicit CheckNumericsOp(OpKernelConstruction* context) : OpKernel(context) {
+    // message_ is used as the prefix for the assertion error message. For
+    // instance, this can be the name of the input op that produced the tensor.
+    OP_REQUIRES_OK(context, context->GetAttr("message", &message_));
+  }
+
+  void Compute(OpKernelContext* context) override {
+    // pass along the input to the output
+    context->set_output(0, context->input(0));
+
+    auto in = context->input(0).flat<T>();
+
+    // allocate a tensor of 2 booleans to store the result
+    // out[0] == is_inf out[1] == isnan
+    Tensor tf_out;
+    const auto& allocate_status = context->allocate_temp(DT_BOOL,
+                                    TensorShape({2}), &tf_out);
+    if (TF_PREDICT_FALSE(!allocate_status.ok()))
+    {
+      context->SetStatus(allocate_status);
+      return;
+    }
+
+    auto out = tf_out.flat<bool>();
+    const auto& d = context->eigen_device<SYCLDevice>();
+    d.memset(out.data(), false, out.size() * sizeof(bool));
+
+    auto input_buffer = d.get_sycl_buffer(in.data());
+    auto output_buffer = d.get_sycl_buffer(out.data());
+
+    const size_t group_size = d.getNearestPowerOfTwoWorkGroupSize();
+    const size_t group_count = (in.size() + group_size - 1) / group_size;
+
+    d.sycl_queue().submit([&](cl::sycl::handler& cgh) {
+      auto input_access =
+        input_buffer.template get_access<cl::sycl::access::mode::read>(cgh);
+      auto output_access = output_buffer.template get_access<
+                             cl::sycl::access::mode::discard_write>(cgh);
+
+      auto kernel = CheckNumericsKernel<T>{input_access, output_access, in.size()};
+
+      // Kernel writes if any value was inf or nan to out
+      cgh.parallel_for(cl::sycl::nd_range<1>(cl::sycl::range<1>(group_size * group_count),
+                                             cl::sycl::range<1>(group_size)), kernel);
+    });
+    std::array<bool, 2> host_out;
+    d.memcpyDeviceToHost(host_out.data(), out.data(), 2 * sizeof(bool));
+    std::string status;
+    if (host_out[0] && host_out[1])
+      status = "Inf and Nan";
+    else if (host_out[0])
+      status = "Inf";
+    else if (host_out[1])
+      status = "Nan";
+    if (!status.empty()) {
+      context->SetStatus(errors::InvalidArgument(message_, " : Tensor had ",
+            status, " values"));
+    }
+  }
+ private:
+  string message_;
+};
+#endif // TENSORFLOW_USE_SYCL
+
 }  // namespace
 
 #define REGISTER_CPU_KERNEL(T)                                         \
@@ -213,6 +328,7 @@ class CheckNumericsOp<GPUDevice, T> : public AsyncOpKernel {
       Name("CheckNumerics").Device(DEVICE_CPU).TypeConstraint<T>("T"), \
       CheckNumericsOp<CPUDevice, T>);
 TF_CALL_half(REGISTER_CPU_KERNEL);
+TF_CALL_bfloat16(REGISTER_CPU_KERNEL);
 TF_CALL_float(REGISTER_CPU_KERNEL);
 TF_CALL_double(REGISTER_CPU_KERNEL);
 
@@ -227,5 +343,14 @@ REGISTER_KERNEL_BUILDER(
     Name("CheckNumerics").Device(DEVICE_GPU).TypeConstraint<double>("T"),
     CheckNumericsOp<GPUDevice, double>);
 #endif  // GOOGLE_CUDA
+
+#ifdef TENSORFLOW_USE_SYCL
+#define REGISTER_SYCL_KERNELS(T)                                        \
+  REGISTER_KERNEL_BUILDER(                                             \
+      Name("CheckNumerics").Device(DEVICE_SYCL).TypeConstraint<T>("T"), \
+      CheckNumericsOp<SYCLDevice, T>);
+
+TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL_KERNELS);
+#endif // TENSORFLOW_USE_SYCL
 
 }  // namespace tensorflow

@@ -30,7 +30,7 @@ bool IsGoogleCudaEnabled() {
 }
 
 bool IsSYCLEnabled() {
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
   return true;
 #else
   return false;
@@ -39,12 +39,17 @@ bool IsSYCLEnabled() {
 
 bool CudaSupportsHalfMatMulAndConv() {
 #if GOOGLE_CUDA
-  // NOTE: We check compile-time and not runtime, since the check for
-  // whether we include the fp16 kernels or not is compile-time.
-  return CUDA_VERSION >= 7050;
+  return true;
 #else
   return false;
 #endif
 }
 
+bool IsMklEnabled() {
+#ifdef INTEL_MKL
+  return true;
+#else
+  return false;
+#endif
+}
 }  // end namespace tensorflow

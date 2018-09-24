@@ -268,7 +268,7 @@ struct ReduceFunctorBase {
 template <typename Reducer>
 struct ReduceFunctor<CPUDevice, Reducer>
     : ReduceFunctorBase<CPUDevice, Reducer> {};
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 template <typename Reducer>
 struct ReduceFunctor<SYCLDevice, Reducer>
     : ReduceFunctorBase<SYCLDevice, Reducer> {};

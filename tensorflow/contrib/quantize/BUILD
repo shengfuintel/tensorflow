@@ -24,6 +24,7 @@ py_test(
         "//tensorflow/python:framework_test_lib",
         "//tensorflow/python:platform_test",
         "//tensorflow/python:session",
+        "//tensorflow/python:variable_scope",
     ],
 )
 
@@ -154,8 +155,10 @@ py_test(
         "//tensorflow/python:array_ops",
         "//tensorflow/python:dtypes",
         "//tensorflow/python:framework_ops",
+        "//tensorflow/python:partitioned_variables",
         "//tensorflow/python:platform_test",
         "//tensorflow/python:session",
+        "//tensorflow/python:variable_scope",
         "//tensorflow/python:variables",
     ],
 )
@@ -244,16 +247,4 @@ py_test(
         "//tensorflow/python:nn_ops",
         "//tensorflow/python:platform_test",
     ],
-)
-
-filegroup(
-    name = "all_files",
-    srcs = glob(
-        ["**/*"],
-        exclude = [
-            "**/METADATA",
-            "**/OWNERS",
-        ],
-    ),
-    visibility = ["//tensorflow:__subpackages__"],
 )

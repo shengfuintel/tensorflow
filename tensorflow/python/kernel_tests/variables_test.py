@@ -496,6 +496,23 @@ class VariablesTestCase(test.TestCase):
       with self.assertRaises(ValueError):
         sess.run(v.initialized_value())
 
+  def testTrainableInProto(self):
+    with ops.Graph().as_default():
+      non_trainable_variable = variables.Variable(
+          trainable=False,
+          initial_value=constant_op.constant(10.0))
+      self.assertEqual(
+          False,
+          variables.Variable(variable_def=non_trainable_variable.to_proto())
+          .trainable)
+      trainable_variable = variables.Variable(
+          trainable=True,
+          initial_value=constant_op.constant(10.0))
+      self.assertEqual(
+          True,
+          variables.Variable(variable_def=trainable_variable.to_proto())
+          .trainable)
+
   def testLoad(self):
     with self.test_session():
       var = variables.Variable(np.zeros((5, 5), np.float32))
@@ -687,7 +704,7 @@ class VariableContainerTest(test.TestCase):
         v1 = variables.Variable([1])
         with ops.container("l2"):
           v2 = variables.Variable([2])
-          special_v = gen_state_ops._variable(
+          special_v = gen_state_ops.variable(
               shape=[1],
               dtype=dtypes.float32,
               name="VariableInL3",

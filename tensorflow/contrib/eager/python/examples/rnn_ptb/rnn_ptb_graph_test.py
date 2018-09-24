@@ -25,11 +25,15 @@ import numpy as np
 import tensorflow as tf
 
 from tensorflow.contrib.eager.python.examples.rnn_ptb import rnn_ptb
+from tensorflow.python.framework import test_util
 
 
 class PTBTest(tf.test.TestCase):
 
   def testTrain(self):
+    if "sycl" in test_util.gpu_device_name().lower():
+      return
+
     batch_size = 20
     sequence_length = 35
     with tf.Graph().as_default(), tf.device(tf.test.gpu_device_name()):
@@ -76,6 +80,9 @@ class PTBBenchmark(tf.test.Benchmark):
         })
 
   def _benchmark_apply(self, label, model):
+    if "sycl" in test_util.gpu_device_name().lower():
+      return
+
     num_iters = 100
     num_warmup = 10
     dataset = tf.data.Dataset.from_tensors(
@@ -116,6 +123,9 @@ class PTBBenchmark(tf.test.Benchmark):
     self._benchmark_apply("graph_cudnn_apply_large", rnn_ptb.large_model(True))
 
   def _benchmark_train(self, label, model):
+    if "sycl" in test_util.gpu_device_name().lower():
+      return
+
     num_iters = 100
     num_warmup = 10
     dataset = tf.data.Dataset.from_tensors(

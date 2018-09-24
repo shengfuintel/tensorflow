@@ -49,7 +49,7 @@ StatusOr<bool> GpuCopyInsertion::Run(HloModule* module) {
   TF_ASSIGN_OR_RETURN(bool changed, generic_copy_insertion.Run(module));
 
   TF_ASSIGN_OR_RETURN(std::unique_ptr<HloDataflowAnalysis> dataflow,
-                      HloDataflowAnalysis::Run(module));
+                      HloDataflowAnalysis::Run(*module));
 
   // Make sure all operands of a library call are in memory instead of constants
   // in IR.
@@ -78,14 +78,13 @@ StatusOr<bool> GpuCopyInsertion::Run(HloModule* module) {
       for (int64 i = 0; i < hlo->operand_count() - 2; ++i) {
         TF_RETURN_IF_ERROR(copy_operand_if_constant(i));
       }
-    } else if (IsCustomCallToDnnConvolution(*hlo)) {
-      // The last argument to a CUDNN convolution is its algorithm, which must
-      // be an HLO constant -- it shouldn't be copied.
-      for (int64 i = 0; i < hlo->operand_count() - 1; ++i) {
-        TF_RETURN_IF_ERROR(copy_operand_if_constant(i));
-      }
-    } else if (ImplementedAsLibraryCall(*hlo)) {
-      // For all other library calls, materialize all the operands into memory.
+    } else if (ImplementedAsLibraryCall(*hlo) ||
+               hlo->opcode() == HloOpcode::kCrossReplicaSum) {
+      // For all other library calls and cross-replica-sum, materialize all the
+      // operands into memory.  (Cross-replica-sum gets its constant args
+      // materialized even if it's not implemented as a libcall to simplify the
+      // implementation.  It's slower, but we can constant fold away constant
+      // args *anyway*, so we just need to make it work.)
       for (int64 i = 0; i < hlo->operand_count(); ++i) {
         TF_RETURN_IF_ERROR(copy_operand_if_constant(i));
       }

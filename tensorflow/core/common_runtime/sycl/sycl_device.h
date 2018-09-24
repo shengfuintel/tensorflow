@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#if !TENSORFLOW_USE_SYCL
+#ifndef TENSORFLOW_USE_SYCL
 #error This file must only be included when building TensorFlow with SYCL support
 #endif
 
@@ -207,7 +207,7 @@ class SYCLDevice : public LocalDevice {
         device_context_(ctx) {
     gpu_device_info_ = new GpuDeviceInfo;
     gpu_device_info_->default_context = device_context_;
-    // TODO {lukeiwanski}: Improve to support multiple GPU devices
+    // TODO(codeplay): Improve to support multiple GPU devices
     gpu_device_info_->gpu_id = 0;
 
     set_tensorflow_gpu_device_info(gpu_device_info_);
@@ -227,6 +227,15 @@ class SYCLDevice : public LocalDevice {
                         DeviceContextMap* device_context_map) override;
 
   Status Sync() override;
+
+  // This method returns an initialization status, in addition to
+  // calling the "done" StatusCallback, if there is a failure to
+  // allocate memory or if the tensor "from" is not DMA-copyable.
+  // If there is no error prior to enqueueing the copy, an OK status
+  // is returned.
+  Status MaybeCopyTensorToGPU(const AllocatorAttributes& alloc_attrs,
+    const Tensor& from, Tensor* to,
+    StatusCallback done);
 
  private:
   Allocator* cpu_allocator_;           // not owned

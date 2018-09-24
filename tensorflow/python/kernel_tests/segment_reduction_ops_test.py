@@ -91,16 +91,18 @@ class SegmentReductionOpTest(SegmentReductionHelper):
     ]
 
     # Each item is np_op1, np_op2, tf_op
-    ops_list = [(np.add, None, math_ops.segment_sum), (self._mean_cum_op,
-                                                       self._mean_reduce_op,
-                                                       math_ops.segment_mean),
+    ops_list = [(np.add, None, math_ops.segment_sum),
+                (self._mean_cum_op, self._mean_reduce_op,
+                 math_ops.segment_mean),
                 (np.ndarray.__mul__, None, math_ops.segment_prod),
                 (np.minimum, None, math_ops.segment_min),
                 (np.maximum, None, math_ops.segment_max)]
 
     # A subset of ops has been enabled for complex numbers
     complex_ops_list = [(np.add, None, math_ops.segment_sum),
-                        (np.ndarray.__mul__, None, math_ops.segment_prod)]
+                        (np.ndarray.__mul__, None, math_ops.segment_prod),
+                        (self._mean_cum_op, self._mean_reduce_op,
+                         math_ops.segment_mean)]
 
     n = 10
     shape = [n, 2]
@@ -541,6 +543,25 @@ class SparseSegmentReductionOpTest(SparseSegmentReductionHelper):
             num_segments=num_segments)
         tf_ans = s.eval()
         self.assertAllClose(np_ans, tf_ans)
+
+  def testWithEmptySegments(self):
+    tf_x = constant_op.constant([], shape=[0, 4], dtype=dtypes_lib.float32)
+    ops_list = [
+        math_ops.sparse_segment_sum_with_num_segments,
+        math_ops.sparse_segment_mean_with_num_segments
+    ]
+    segment_indices = []
+    tf_indices = []
+    num_segments = 5
+    with self.test_session(use_gpu=False):
+      for tf_op in ops_list:
+        s = tf_op(
+            data=tf_x,
+            indices=tf_indices,
+            segment_ids=segment_indices,
+            num_segments=num_segments)
+        tf_ans = s.eval()
+        self.assertAllClose(np.zeros([5, 4]), tf_ans)
 
   def testSegmentIdsGreaterThanZero(self):
     tf_x, np_x = self._input([10, 4], dtype=dtypes_lib.float32)

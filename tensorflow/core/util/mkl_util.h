@@ -19,6 +19,8 @@ limitations under the License.
 
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <utility>
 
 #include "mkl_dnn.h"
 #include "mkl_dnn_types.h"
@@ -43,6 +45,10 @@ using mkldnn::memory;
 using mkldnn::padding_kind;
 using mkldnn::primitive;
 using mkldnn::reorder;
+#endif
+
+#ifdef _WIN32
+typedef unsigned int uint;
 #endif
 
 // The file contains a number of utility classes and functions used by MKL
@@ -700,15 +706,48 @@ inline Tensor ConvertMklToTF(OpKernelContext* context, const Tensor& mkl_tensor,
   return output_tensor;
 }
 #else
+using mkldnn::stream;
+template <typename T> class MklDnnData;
+
 template <typename T>
 inline Tensor ConvertMklToTF(OpKernelContext* context, const Tensor& mkl_tensor,
                              const MklDnnShape& mkl_shape) {
   Tensor output_tensor;
-  TensorShape output_shape;
+  try {
+    if (!mkl_shape.IsMklTensor())
+      return mkl_tensor;  // return input since it is already TF tensor
 
-  TF_CHECK_OK(
-      Status(error::Code::UNIMPLEMENTED, "Unimplemented conversion function"));
+    TensorShape output_shape = mkl_shape.GetTfShape();;
 
+    // Allocate output tensor.
+    context->allocate_temp(DataTypeToEnum<T>::v(),
+        output_shape, &output_tensor);
+
+    auto cpu_engine = engine(engine::cpu, 0);
+    MklDnnData<T> input(&cpu_engine);
+
+    // Get Mkl layout of input tensor.
+    auto input_mkl_md = mkl_shape.GetMklLayout();
+    auto output_tf_md = mkl_shape.GetTfLayout();
+    auto output_tf_pd = memory::primitive_desc(output_tf_md, cpu_engine);
+    input.SetUsrMem(input_mkl_md, &mkl_tensor);
+
+    // reorder
+    if (input.IsReorderNeeded(output_tf_pd)) {
+      std::vector<primitive> net;
+      CHECK_EQ(input.CheckReorderToOpMem(output_tf_pd, &output_tensor, &net),
+             true);
+      stream(stream::kind::eager).submit(net).wait();
+    } else {
+      // If not, just forward input tensor to output tensor.
+      CHECK(output_tensor.CopyFrom(mkl_tensor, output_shape));
+    }
+  } catch (mkldnn::error& e) {
+    string error_msg = "Status: " + std::to_string(e.status) +
+                       ", message: " + string(e.message) + ", in file " +
+                       string(__FILE__) + ":" + std::to_string(__LINE__);
+    LOG(FATAL) << "Operation received an exception: " << error_msg;
+  }
   return output_tensor;
 }
 #endif
@@ -1112,9 +1151,11 @@ inline void ForwardMklTensorInToOutWithMklShape(OpKernelContext* context,
 // Forward the MKL shape ONLY (used in elementwise and other ops where
 // we call the eigen implementation and MKL shape is not used)
 inline void ForwardMklMetaDataInToOut(OpKernelContext* context,
-                                      uint idx_data_in, uint idx_data_out) {
-  uint idx_meta_in = GetTensorMetaDataIndex(idx_data_in, context->num_inputs());
-  uint idx_meta_out =
+                                      uint32 idx_data_in,
+                                      uint32_t idx_data_out) {
+  uint32 idx_meta_in =
+      GetTensorMetaDataIndex(idx_data_in, context->num_inputs());
+  uint32 idx_meta_out =
       GetTensorMetaDataIndex(idx_data_out, context->num_outputs());
 
   if (IsRefType(context->input_dtype(idx_data_in))) {
@@ -1126,7 +1167,7 @@ inline void ForwardMklMetaDataInToOut(OpKernelContext* context,
 
 // Set a dummy MKL shape (called when the output is in TF format)
 inline void SetDummyMklShapeOutput(OpKernelContext* context,
-                                   uint idx_data_out) {
+                                   uint32 idx_data_out) {
   MklShape mkl_shape_output;
   mkl_shape_output.SetMklTensor(false);
   AllocateOutputSetMklShape(context, idx_data_out, mkl_shape_output);
@@ -1351,7 +1392,7 @@ inline memory::dims MklDnnDimsInNCHW(const memory::dims& in_dims,
 /// Map MklDnn memory::dims object into TensorShape object.
 ///
 /// This function will simply map input shape in MKL-DNN memory::dims format
-/// in Tensorflow's TensorShape object by perserving dimension order.
+/// in Tensorflow's TensorShape object by preserving dimension order.
 ///
 /// @input MKL-DNN memory::dims object
 /// @output TensorShape corresponding to memory::dims
@@ -1577,10 +1618,10 @@ class MklDnnData {
   }
 
   /// Set function for data buffer of user memory primitive.
-  inline void* SetUsrMemDataHandle(void* data_buffer) {
+  inline void SetUsrMemDataHandle(void* data_buffer) {
     CHECK_NOTNULL(user_memory_);
     CHECK_NOTNULL(data_buffer);
-    return user_memory_->set_data_handle(data_buffer);
+    user_memory_->set_data_handle(data_buffer);
   }
 
   /// Set function for data buffer of user memory primitive.
@@ -1753,7 +1794,90 @@ class MklDnnData {
   }
 };
 
-#endif  // INTEL_MKL_ML
+/// Base class for operations with reuse of DNN primitives
+///
+class DnnOp {
+ public:
+  virtual ~DnnOp() {}
+
+  // Dummy data. Its size, hard-coded as 256 here, does
+  // not matter since MKL should never operate on this buffer.
+  unsigned char DummyData[256];
+};
+
+const mkldnn::memory::dims NONE_DIMS = {};
+// This constant is used to declare dummy buffer (size), for MKL primitives
+template <typename T>
+class DnnOpFactory {
+ public:
+  DnnOpFactory() {}
+  ~DnnOpFactory() {}
+
+  DnnOp* GetOp(const std::string& key) {
+    auto stream_iter = DnnOpFactory<T>::GetHashMap().find(key);
+    if (stream_iter == DnnOpFactory<T>::GetHashMap().end()) {
+      return nullptr;
+    } else {
+      return stream_iter->second;
+    }
+  }
+
+  void SetOp(const std::string& key, DnnOp* op) {
+    auto stream_iter = DnnOpFactory<T>::GetHashMap().find(key);
+
+    CHECK(stream_iter == DnnOpFactory<T>::GetHashMap().end());
+
+    DnnOpFactory<T>::GetHashMap()[key] = op;
+  }
+
+ private:
+  static inline std::unordered_map<std::string, DnnOp*> &GetHashMap() {
+    static thread_local std::unordered_map<std::string, DnnOp*> map_;
+    return map_;
+  }
+};
+
+// utility class for creating keys of MKL primitive pool.
+class FactoryKeyCreator {
+ public:
+  FactoryKeyCreator() {
+    key_.reserve(kMaxKeyLength);
+  }
+
+  ~FactoryKeyCreator() {}
+
+  void AddAsKey(const string &str) {
+    auto buffer = reinterpret_cast<const char *>(str.c_str());
+    Append(buffer, str.length());
+  }
+
+  void AddAsKey(const mkldnn::memory::dims &dims) {
+    for (unsigned int i = 0; i < dims.size(); i++) {
+      AddAsKey<int>(dims[i]);
+    }
+  }
+
+  template <typename T>
+  void AddAsKey(const T data) {
+    auto buffer = reinterpret_cast<const char *>(&data);
+    Append(buffer, sizeof(T));
+  }
+
+  std::string GetKey() {
+    return key_;
+  }
+
+ private:
+  string key_;
+  const char delimiter = 'x';
+  const int kMaxKeyLength = 256;
+  void Append(const char* data, int len) {
+    key_.append(data, len);
+    key_.append(1, delimiter);
+  }
+};
+
+#endif  // INTEL_MKL_DNN
 
 }  // namespace tensorflow
 #endif  // INTEL_MKL

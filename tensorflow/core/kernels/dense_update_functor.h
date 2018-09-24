@@ -19,11 +19,14 @@ limitations under the License.
 #define EIGEN_USE_THREADS
 
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
+#include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/tensor_types.h"
 
 namespace tensorflow {
 
 typedef Eigen::ThreadPoolDevice CPUDevice;
+typedef Eigen::GpuDevice GPUDevice;
+
 #ifdef TENSORFLOW_USE_SYCL
 typedef Eigen::SyclDevice SYCLDevice;
 #endif  // TENSORFLOW_USE_SYCL
@@ -83,12 +86,26 @@ template <typename T>
 struct DenseUpdate<SYCLDevice, T, ASSIGN> {
   void operator()(const SYCLDevice& d, typename TTypes<T>::Flat params,
                   typename TTypes<T>::ConstFlat update) {
-    params.device(d) = update;
+    // Copying a buffer to itself will cause an error.
+    // The check isn't done in Eigen because it would add a cost for the normal case
+    if (params.data() != update.data())
+      params.device(d) = update;
   }
 };
 #endif  // TENSORFLOW_USE_SYCL
 
 }  // end namespace functor
+
+template <typename Device>
+Status VariantCopyFn(OpKernelContext* context, const Tensor& from, Tensor* to);
+
+template <>
+Status VariantCopyFn<CPUDevice>(OpKernelContext* context, const Tensor& from,
+                                Tensor* to);
+template <>
+Status VariantCopyFn<GPUDevice>(OpKernelContext* context, const Tensor& from,
+                                Tensor* to);
+
 }  // end namespace tensorflow
 
 #endif  // TENSORFLOW_KERNELS_DENSE_UPDATE_FUNCTOR_H_

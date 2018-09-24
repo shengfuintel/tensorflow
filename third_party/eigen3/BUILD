@@ -41,7 +41,7 @@ cc_library(
     deps = [
         "@eigen_archive//:eigen",
     ] + if_sycl([
-        "@local_config_sycl//sycl:sycl_headers",
+        "@local_config_sycl//sycl:sycl",
     ]),
 )
 

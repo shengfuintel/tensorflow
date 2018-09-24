@@ -55,11 +55,12 @@ class TrivialResolver : public OpResolver {
   explicit TrivialResolver(TfLiteRegistration* constant_return = nullptr)
       : constant_return_(constant_return) {}
   // Find the op registration of a custom operator by op name.
-  TfLiteRegistration* FindOp(tflite::BuiltinOperator op) const override {
+  const TfLiteRegistration* FindOp(tflite::BuiltinOperator op,
+                                   int version) const override {
     return constant_return_;
   }
   // Find the op registration of a custom operator by op name.
-  TfLiteRegistration* FindOp(const char* op) const override {
+  const TfLiteRegistration* FindOp(const char* op, int version) const override {
     return constant_return_;
   }
 
@@ -207,6 +208,38 @@ TEST(BasicFlatBufferModel, TestNullModel) {
       InterpreterBuilder(nullptr, TrivialResolver(&dummy_reg))(&interpreter),
       kTfLiteOk);
   ASSERT_EQ(interpreter.get(), nullptr);
+}
+
+// Mocks the verifier by setting the result in ctor.
+class FakeVerifier : public tflite::TfLiteVerifier {
+ public:
+  explicit FakeVerifier(bool result) : result_(result) {}
+  bool Verify(const char* data, int length,
+              tflite::ErrorReporter* reporter) override {
+    return result_;
+  }
+
+ private:
+  bool result_;
+};
+
+TEST(BasicFlatBufferModel, TestWithTrueVerifier) {
+  FakeVerifier verifier(true);
+  ASSERT_TRUE(FlatBufferModel::VerifyAndBuildFromFile(
+      "tensorflow/contrib/lite/testdata/test_model.bin",
+      &verifier));
+}
+
+TEST(BasicFlatBufferModel, TestWithFalseVerifier) {
+  FakeVerifier verifier(false);
+  ASSERT_FALSE(FlatBufferModel::VerifyAndBuildFromFile(
+      "tensorflow/contrib/lite/testdata/test_model.bin",
+      &verifier));
+}
+
+TEST(BasicFlatBufferModel, TestWithNullVerifier) {
+  ASSERT_TRUE(FlatBufferModel::VerifyAndBuildFromFile(
+      "tensorflow/contrib/lite/testdata/test_model.bin", nullptr));
 }
 
 struct TestErrorReporter : public ErrorReporter {

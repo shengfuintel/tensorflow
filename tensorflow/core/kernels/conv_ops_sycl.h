@@ -29,7 +29,7 @@ struct LaunchConv2DOp<SYCLDevice, T> {
   void operator()(OpKernelContext* context, bool /*use_cudnn*/,
                   bool /*cudnn_use_autotune*/, const Tensor& input,
                   const Tensor& filter, int row_dilation, int col_dilation,
-                  int64 stride_rows, int64 stride_cols, const Padding& padding,
+                  int stride_rows_, int stride_cols_, const Padding& padding,
                   Tensor* output, TensorFormat data_format) {
     if (row_dilation > 1 || col_dilation > 1) {
       context->SetStatus(
@@ -41,6 +41,8 @@ struct LaunchConv2DOp<SYCLDevice, T> {
     const int64 input_rows = GetTensorDim(input, data_format, 'H');
     const int64 input_cols = GetTensorDim(input, data_format, 'W');
 
+    const int64 stride_rows = stride_rows_;
+    const int64 stride_cols = stride_cols_;
     const int64 filter_rows = filter.dim_size(0);
     const int64 filter_cols = filter.dim_size(1);
     const int64 in_depth = filter.dim_size(2);
@@ -77,8 +79,8 @@ template <typename T>
 struct LaunchConv2DBackpropInputOp<SYCLDevice, T> {
   void operator()(OpKernelContext* context, bool /*use_cudnn*/,
                   bool /*cudnn_use_autotune*/, const Tensor& out_backprop,
-                  const Tensor& filter, int32 row_dilation, int32 col_dilation,
-                  int64 stride_rows, int64 stride_cols, const Padding& padding,
+                  const Tensor& filter, int row_dilation, int col_dilation,
+                  int stride_rows_, int stride_cols_, const Padding& padding,
                   Tensor* in_backprop, TensorFormat data_format) {
     if (row_dilation > 1 || col_dilation > 1) {
       context->SetStatus(
@@ -90,6 +92,8 @@ struct LaunchConv2DBackpropInputOp<SYCLDevice, T> {
     const int64 input_rows = GetTensorDim(*in_backprop, data_format, 'H');
     const int64 input_cols = GetTensorDim(*in_backprop, data_format, 'W');
 
+    const int64 stride_rows = stride_rows_;
+    const int64 stride_cols = stride_cols_;
     const int64 filter_rows = filter.dim_size(0);
     const int64 filter_cols = filter.dim_size(1);
     const int64 in_depth = filter.dim_size(2);
@@ -127,8 +131,8 @@ template <typename T>
 struct LaunchConv2DBackpropFilterOp<SYCLDevice, T> {
   void operator()(OpKernelContext* context, bool /*use_cudnn*/,
                   bool /*cudnn_use_autotune*/, const Tensor& out_backprop,
-                  const Tensor& input, int32 row_dilation, int32 col_dilation,
-                  int64 stride_rows, int64 stride_cols, const Padding& padding,
+                  const Tensor& input, int row_dilation, int col_dilation,
+                  int stride_rows_, int stride_cols_, const Padding& padding,
                   Tensor* filter_backprop, TensorFormat data_format) {
     if (row_dilation > 1 || col_dilation > 1) {
       context->SetStatus(
@@ -140,6 +144,8 @@ struct LaunchConv2DBackpropFilterOp<SYCLDevice, T> {
     const int64 input_rows = GetTensorDim(input, data_format, 'H');
     const int64 input_cols = GetTensorDim(input, data_format, 'W');
 
+    const int64 stride_rows = stride_rows_;
+    const int64 stride_cols = stride_cols_;
     const int64 filter_rows = filter_backprop->dim_size(0);
     const int64 filter_cols = filter_backprop->dim_size(1);
     const int64 in_depth = filter_backprop->dim_size(2);

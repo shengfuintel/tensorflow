@@ -421,8 +421,8 @@ struct LaunchIm2Col {
     for (int i = 0; i < alloc_info.n_input_transforms; ++i) {
       im2col::Offsets offset =
           im2col::calculate_offsets<CType>(i, images_per_alloc, params);
-      assert(i == 0 || in_offset > 0);
-      assert(i == 0 || out_offset > 0);
+      assert(i == 0 || offset.in > 0);
+      assert(i == 0 || offset.out > 0);
       if (i == alloc_info.n_input_transforms - 1) {
         images_per_alloc = alloc_info.last_batch_size;
       }

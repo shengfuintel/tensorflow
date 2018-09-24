@@ -54,7 +54,7 @@ struct FillPhiloxRandom<GPUDevice, Distribution> {
 };
 #endif  // GOOGLE_CUDA
 
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 typedef Eigen::SyclDevice SYCLDevice;
 // Declares the partially SYCL-specialized functor struct.
 template <class Distribution>

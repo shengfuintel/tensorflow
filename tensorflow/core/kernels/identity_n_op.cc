@@ -25,7 +25,7 @@ namespace tensorflow {
 
 REGISTER_KERNEL_BUILDER(Name("IdentityN").Device(DEVICE_CPU), IdentityNOp);
 
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 REGISTER_KERNEL_BUILDER(Name("IdentityN").Device(DEVICE_SYCL), IdentityNOp);
 #endif
 

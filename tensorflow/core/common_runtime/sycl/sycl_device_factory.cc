@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 
 #include "tensorflow/core/common_runtime/device_factory.h"
 #include "tensorflow/core/common_runtime/sycl/sycl_device.h"

@@ -41,6 +41,7 @@ cuda_py_test(
         "//tensorflow/python:math_ops",
         "//tensorflow/python:platform_test",
     ],
+    shard_count = 3,
 )
 
 cuda_py_test(
@@ -107,7 +108,8 @@ cuda_py_test(
 
 cuda_py_test(
     name = "dirichlet_test",
-    size = "small",
+#TODO(codeplay): bazel doesn't let us configure the size field
+    size = "large",
     srcs = ["dirichlet_test.py"],
     additional_deps = [
         "//tensorflow/python/ops/distributions",
@@ -279,16 +281,4 @@ cuda_py_test(
         "//tensorflow/python:math_ops",
         "//tensorflow/python:platform_test",
     ],
-)
-
-filegroup(
-    name = "all_files",
-    srcs = glob(
-        ["**/*"],
-        exclude = [
-            "**/METADATA",
-            "**/OWNERS",
-        ],
-    ),
-    visibility = ["//tensorflow:__subpackages__"],
 )

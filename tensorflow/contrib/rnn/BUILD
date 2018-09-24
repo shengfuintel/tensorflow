@@ -24,8 +24,6 @@ load(
     "tf_kernel_tests_linkstatic",
 )
 
-load("@local_config_sycl//sycl:build_defs.bzl", "if_sycl")
-
 cc_library(
     name = "all_ops",
     deps = [
@@ -195,6 +193,10 @@ tf_py_test(
         "//tensorflow/python:variable_scope",
         "//tensorflow/python:variables",
     ],
+    tags = [
+        "manual",
+        "notap",
+    ],
 )
 
 cuda_py_tests(
@@ -233,9 +235,7 @@ tf_custom_op_library(
     ],
     deps = [
         "//tensorflow/core/kernels:eigen_helpers",
-    ] + if_sycl([
-        "@local_config_sycl//sycl:syclrt",
-    ]),
+    ],
 )
 
 tf_gen_op_wrapper_py(
@@ -259,9 +259,7 @@ tf_custom_op_library(
     ],
     deps = [
         "//tensorflow/core/kernels:eigen_helpers",
-    ] + if_sycl([
-        "@local_config_sycl//sycl:syclrt",
-    ]),
+    ],
 )
 
 tf_gen_op_wrapper_py(
@@ -329,19 +327,6 @@ tf_cc_test(
         "//tensorflow/core:test_main",
         "//tensorflow/core:testlib",
     ],
-)
-
-filegroup(
-    name = "all_files",
-    srcs = glob(
-        ["**/*"],
-        exclude = [
-            "**/METADATA",
-            "**/OWNERS",
-            "tools/**",
-        ],
-    ),
-    visibility = ["//tensorflow:__subpackages__"],
 )
 
 tf_gen_op_libs(

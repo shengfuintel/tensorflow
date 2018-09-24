@@ -21,13 +21,32 @@ REGISTER6(BinaryOp, CPU, "NotEqual", functor::not_equal_to, float, Eigen::half,
 #if GOOGLE_CUDA
 REGISTER4(BinaryOp, GPU, "NotEqual", functor::not_equal_to, float, Eigen::half,
           double, uint8);
+// A special GPU kernel for int32.
+// TODO(b/25387198): Also enable int32 in device memory. This kernel
+// registration requires all int32 inputs and outputs to be in host memory.
+REGISTER_KERNEL_BUILDER(Name("NotEqual")
+                            .Device(DEVICE_GPU)
+                            .HostMemory("x")
+                            .HostMemory("y")
+                            .HostMemory("z")
+                            .TypeConstraint<int32>("T"),
+                        BinaryOp<CPUDevice, functor::not_equal_to<int32>>);
 #endif
 
 #ifdef TENSORFLOW_USE_SYCL
-REGISTER(BinaryOp, SYCL, "NotEqual", functor::not_equal_to, uint8);
 #define REGISTER_SYCL(type) \
   REGISTER(BinaryOp, SYCL, "NotEqual", functor::not_equal_to, type)
 TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL);
+TF_CALL_uint8(REGISTER_SYCL);
 #undef REGISTER_SYCL
+
+REGISTER_KERNEL_BUILDER(Name("NotEqual")
+                            .Device(DEVICE_SYCL)
+                            .HostMemory("x")
+                            .HostMemory("y")
+                            .HostMemory("z")
+                            .TypeConstraint<int32>("T"),
+                        BinaryOp<CPUDevice, functor::not_equal_to<int32>>);
 #endif  // TENSORFLOW_USE_SYCL
+
 }  // namespace tensorflow
