@@ -160,6 +160,7 @@ struct ScatterNdFunctor<CPUDevice, T, Index, OP, IXDIM> {
   REGISTER_SCATTER_ND_INDEX(type, scatter_nd_op::UpdateOp::SUB);
 
 TF_CALL_ALL_TYPES(REGISTER_SCATTER_ND_UPDATE);
+REGISTER_SCATTER_ND_INDEX(string, scatter_nd_op::UpdateOp::ADD);
 TF_CALL_NUMBER_TYPES(REGISTER_SCATTER_ND_MATH)
 
 #undef REGISTER_SCATTER_ND_MATH
@@ -199,7 +200,7 @@ struct LeftUpdateSYCL<PTR, T, scatter_nd_op::UpdateOp::SUB> {
 template <typename T, typename Index, scatter_nd_op::UpdateOp op, int IXDIM>
 struct ScatterNdKernel {
   using write_accessor =
-      cl::sycl::accessor<uint8_t, 1, cl::sycl::access::mode::write,
+      cl::sycl::accessor<uint8_t, 1, cl::sycl::access::mode::read_write,
                          cl::sycl::access::target::global_buffer>;
   using read_accessor =
       cl::sycl::accessor<uint8_t, 1, cl::sycl::access::mode::read,
@@ -208,38 +209,42 @@ struct ScatterNdKernel {
   ScatterNdKernel(
       const read_accessor indices, const read_accessor updates,
       write_accessor out,
-      const Eigen::array<Eigen::DenseIndex, IXDIM> output_shape_prefix,
-      const Eigen::array<int64, IXDIM> batch_strides, const int64 num_indices,
-      const Index slice_size)
+      const Index batch_size, const Index slice_size,
+      const unsigned int out_size,
+      const cl::sycl::cl_int batch_strides[IXDIM])
       : indices_(indices),
         updates_(updates),
         out_(out),
-        output_shape_prefix_(output_shape_prefix),
-        batch_strides_(batch_strides),
-        num_indices_(num_indices),
-        slice_size_(slice_size) {}
+        batch_size_(batch_size),
+        slice_size_(slice_size),
+        out_size_(out_size)
+        {
+          for (int i = 0; i < IXDIM; ++i)
+            batch_strides_[i] = batch_strides[i];
+        }
 
-  void operator()(cl::sycl::item<1> id) {
+  void operator()(cl::sycl::nd_item<1> item) {
+    const auto curr_item = item.get_global_id(0);
+    if (curr_item >= slice_size_)
+      return;
+
     const T* updates = ConvertToActualTypeSycl(T, updates_);
     const Index* indices = ConvertToActualTypeSycl(Index, indices_);
     T* out = ConvertToActualTypeSycl(T, out_);
 
-    auto update = LeftUpdateSYCL<decltype(out), T, op>();
+    auto update_op = LeftUpdateSYCL<decltype(out), T, op>();
 
-    for (Index index = 0; index < num_indices_; index++) {
-      Index i = 0;
-      bool out_of_bounds = false;
-      for (int dim = 0; dim < IXDIM; ++dim) {
-        int offset = (IXDIM * index + dim);
-        const Index ix_d = indices[offset];
-        out_of_bounds |= !FastBoundsCheck(ix_d, output_shape_prefix_[dim]);
-        i += ix_d * batch_strides_[dim] * slice_size_;
-      }
-      if (!out_of_bounds) {
-        for (int si = 0; si < slice_size_; si++) {
-          update(out + i + si, updates[index * slice_size_ + si]);
-        }
-      }
+    // Iterate through every index and update the curr_item corresponding to that slice
+    for (int idx = 0; idx < batch_size_; ++idx)
+    {
+      // update_idx is the index of the element that needs to be changed in out
+      auto update_idx = 0;
+      for (int i = 0; i < IXDIM; ++i)
+        update_idx += indices[(idx * IXDIM) + i] * batch_strides_[i];
+      update_idx += curr_item;
+
+      if (update_idx < out_size_)
+        update_op(out + update_idx, updates[idx * slice_size_ + curr_item]);
     }
   }
 
@@ -247,10 +252,11 @@ struct ScatterNdKernel {
   const read_accessor indices_;
   const read_accessor updates_;
   write_accessor out_;
-  const Eigen::array<Eigen::DenseIndex, IXDIM> output_shape_prefix_;
-  const Eigen::array<int64, IXDIM> batch_strides_;
-  const int64 num_indices_;
+
+  const Index batch_size_;
   const Index slice_size_;
+  const unsigned int out_size_;
+  cl::sycl::cl_int batch_strides_[IXDIM];
 };
 
 // Implementation of update functor for SYCL.
@@ -263,24 +269,27 @@ struct ScatterNdFunctor<SYCLDevice, T, Index, OP, IXDIM> {
       typename TTypes<Index, 2>::ConstTensor Tindices,
       typename TTypes<T, 2>::ConstTensor Tupdates,
       typename TTypes<T, 2>::Tensor Toutput) {
+
     const Eigen::DenseIndex batch_size = Tindices.dimension(0);
+    const int num_threads = batch_size;
 
-    // Index batch_strides[IXDIM];
-    Eigen::array<int64, IXDIM> batch_strides;
-    for (int dim = IXDIM - 1; dim >= 0; --dim) {
-      if (dim == IXDIM - 1) {
-        batch_strides[dim] = 1;
-      } else {
-        batch_strides[dim] =
-            batch_strides[dim + 1] * output_shape_prefix[dim + 1];
-      }
+    // batch_strides are the number of dimensions in each rank, is used to know
+    // how many elements to skip on each rank when accessing indices
+    cl::sycl::cl_int batch_strides[IXDIM];
+    for (int dim = 0; dim < IXDIM; ++dim)
+    {
+      batch_strides[dim] = slice_size;
+      for (int i = dim + 1; i < IXDIM; ++i)
+        batch_strides[dim] *= output_shape_prefix[i]; 
     }
-
-    const int num_threads = Toutput.size();
 
     auto indices_buffer = d.get_sycl_buffer(Tindices.data());
     auto updates_buffer = d.get_sycl_buffer(Tupdates.data());
     auto output_buffer = d.get_sycl_buffer(Toutput.data());
+
+    const size_t group_size = std::min(static_cast<size_t>(slice_size),
+                                       d.getNearestPowerOfTwoWorkGroupSize());
+    const size_t group_count = (slice_size + group_size - 1) / group_size;
 
     d.sycl_queue().submit([&](cl::sycl::handler& cgh) {
       auto indices_access =
@@ -289,13 +298,14 @@ struct ScatterNdFunctor<SYCLDevice, T, Index, OP, IXDIM> {
           updates_buffer.template get_access<cl::sycl::access::mode::read>(cgh);
 
       auto output_access =
-          output_buffer.template get_access<cl::sycl::access::mode::write>(cgh);
+          output_buffer.template get_access<cl::sycl::access::mode::read_write>(cgh);
 
       ScatterNdKernel<T, Index, OP, IXDIM> kernel(
-          indices_access, updates_access, output_access, output_shape_prefix,
-          batch_strides, batch_size, slice_size);
+          indices_access, updates_access, output_access, batch_size,
+          slice_size, Toutput.size(), batch_strides);
 
-      cgh.parallel_for(cl::sycl::range<1>(num_threads), kernel);
+      cgh.parallel_for(cl::sycl::nd_range<1>(cl::sycl::range<1>(group_size * group_count),
+                                             cl::sycl::range<1>(group_size)), kernel);
     });
 
     return -1;

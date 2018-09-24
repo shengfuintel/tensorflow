@@ -74,7 +74,7 @@ StatusOr<OpMetadata> OpMetadataFromPyObject(PyObject* o);
 // array data.
 //
 // The return value is a new reference.
-PyObject* PyObjectFromXlaLiteral(const Literal& literal);
+PyObject* PyObjectFromXlaLiteral(const LiteralSlice& literal);
 
 // Converts a Numpy ndarray or a nested Python tuple thereof to a
 // corresponding XLA literal.
@@ -90,7 +90,7 @@ StatusOr<std::unique_ptr<Literal> > XlaLiteralFromPyObject(PyObject* o);
 Status CopyNumpyArrayToLiteral(int np_type, PyArrayObject* py_array,
                                Literal* literal);
 
-void CopyLiteralToNumpyArray(int np_type, const Literal& literal,
+void CopyLiteralToNumpyArray(int np_type, const LiteralSlice& literal,
                              PyArrayObject* py_array);
 
 template <typename NativeT>
@@ -101,11 +101,15 @@ void CopyNumpyArrayToLiteral(PyArrayObject* py_array, Literal* literal) {
 }
 
 template <typename NativeT>
-void CopyLiteralToNumpyArray(const Literal& literal, PyArrayObject* py_array) {
+void CopyLiteralToNumpyArray(const LiteralSlice& literal,
+                             PyArrayObject* py_array) {
   NativeT* dest = static_cast<NativeT*>(PyArray_DATA(py_array));
   auto source = literal.data<NativeT>();
   std::copy(source.begin(), source.end(), dest);
 }
+
+// Safely returns a repr of the given Python object o as a C++ string.
+string PyObjectCppRepr(PyObject* o);
 
 // Workarounds for Python 2 and 3 interop
 

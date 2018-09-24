@@ -59,11 +59,8 @@ toolchain {
   cxx_flag: "-std=c++11"
   cxx_flag: "-fsycl-ih-last"
   cxx_flag: "-sycl-driver"
-  cxx_flag: "-Xclang"
   cxx_flag: "-cl-denorms-are-zero"
-  cxx_flag: "-Xclang"
   cxx_flag: "-cl-fp32-correctly-rounded-divide-sqrt"
-  cxx_flag: "-Xclang"
   cxx_flag: "-cl-mad-enable"
   cxx_flag: "-sycl-target"
   cxx_flag: "%{BITCODE_FORMAT}%"
@@ -82,10 +79,13 @@ toolchain {
 
   compiler_flag: "-ffunction-sections"
   compiler_flag: "-fdata-sections"
-  compiler_flag: "-fPIE"
+  compiler_flag: "-fPIC"
   compiler_flag: "-fno-omit-frame-pointer"
   compiler_flag: "-Wall"
 
+# ComputeCpp must be linked for the target configuration only
+  linker_flag: "-lComputeCpp"
+  linker_flag: "-L%{COMPUTECPP_ROOT_DIR}%/lib/"
   linker_flag: "-lstdc++"
   linker_flag: "-B/usr/bin/"
   linker_flag: "-no-canonical-prefixes"
@@ -110,8 +110,6 @@ toolchain {
     compiler_flag: "-g0"
     compiler_flag: "-O2"
     compiler_flag: "-DNDEBUG"
-    compiler_flag: "-ffunction-sections"
-    compiler_flag: "-fdata-sections"
     linker_flag: "-Wl,--gc-sections"
   }
 
@@ -161,11 +159,8 @@ toolchain {
   cxx_flag: "-std=c++11"
   cxx_flag: "-fsycl-ih-last"
   cxx_flag: "-sycl-driver"
-  cxx_flag: "-Xclang"
   cxx_flag: "-cl-denorms-are-zero"
-  cxx_flag: "-Xclang"
   cxx_flag: "-cl-fp32-correctly-rounded-divide-sqrt"
-  cxx_flag: "-Xclang"
   cxx_flag: "-cl-mad-enable"
   cxx_flag: "-sycl-target"
   cxx_flag: "%{BITCODE_FORMAT}%"
@@ -184,10 +179,13 @@ toolchain {
 
   compiler_flag: "-ffunction-sections"
   compiler_flag: "-fdata-sections"
-  compiler_flag: "-fPIE"
+  compiler_flag: "-fPIC"
   compiler_flag: "-fno-omit-frame-pointer"
   compiler_flag: "-Wall"
 
+# ComputeCpp must be linked for the target configuration only
+  linker_flag: "-lComputeCpp"
+  linker_flag: "-L%{COMPUTECPP_ROOT_DIR}%/lib/"
   linker_flag: "-target"
   linker_flag: "%{CROSS_TARGET}%"
   linker_flag: "--gcc-toolchain=%{CROSS_COMPILER_PATH}%"
@@ -207,6 +205,8 @@ toolchain {
   compilation_mode_flags {
     mode: DBG
     compiler_flag: "-g"
+    # Seems to be needed for ARM only
+    compiler_flag: "-mcmodel=large"
   }
 
   compilation_mode_flags {
@@ -214,8 +214,6 @@ toolchain {
     compiler_flag: "-g0"
     compiler_flag: "-O2"
     compiler_flag: "-DNDEBUG"
-    compiler_flag: "-ffunction-sections"
-    compiler_flag: "-fdata-sections"
     linker_flag: "-Wl,--gc-sections"
   }
 

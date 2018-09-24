@@ -204,7 +204,7 @@ TF_CALL_float(REGISTER_GPU_KERNEL);
 
 #endif  // GOOGLE_CUDA
 
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 #define REGISTER_KERNEL(T)                                         \
   REGISTER_KERNEL_BUILDER(Name("BatchNormWithGlobalNormalization") \
                               .Device(DEVICE_SYCL)                 \
@@ -262,7 +262,7 @@ TF_CALL_float(REGISTER_GPU_KERNEL);
 
 #endif  // GOOGLE_CUDA
 
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 #define REGISTER_KERNEL(T)                                             \
   REGISTER_KERNEL_BUILDER(Name("BatchNormWithGlobalNormalizationGrad") \
                               .Device(DEVICE_SYCL)                     \

@@ -72,7 +72,9 @@ class PrintModelAnalysisTest(test.TestCase):
 
   def testSelectEverythingDetail(self):
     ops.reset_default_graph()
-    dev = '/device:GPU:0' if test.is_gpu_available() else '/device:CPU:0'
+    dev = '/device:CPU:0'
+    if test.is_gpu_available():
+      dev = '/device:{}:0'.format(test_util.gpu_device_type())
     outfile = os.path.join(test.get_temp_dir(), 'dump')
     opts = (builder(builder.trainable_variables_parameter())
             .with_file_output(outfile)
@@ -232,7 +234,12 @@ class PrintModelAnalysisTest(test.TestCase):
 
         self.assertLess(0, tfprof_node.total_exec_micros)
         self.assertEqual(2844, tfprof_node.total_parameters)
-        self.assertLess(168800, tfprof_node.total_float_ops)
+        #The graph is modifed when MKL is enabled,total_float_ops will
+        #be different
+        if test_util.IsMklEnabled():
+          self.assertLess(101600, tfprof_node.total_float_ops)
+        else:
+          self.assertLess(145660, tfprof_node.total_float_ops)
         self.assertEqual(8, len(tfprof_node.children))
         self.assertEqual('_TFProfRoot', tfprof_node.name)
         self.assertEqual(

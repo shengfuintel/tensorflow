@@ -11,7 +11,6 @@ load("//tensorflow:tensorflow.bzl", "if_cuda")
 load("//tensorflow:tensorflow.bzl", "tf_copts")
 load("//tensorflow:tensorflow.bzl", "tf_cuda_library")
 load("//tensorflow/core:platform/default/build_config_root.bzl", "if_static")
-load("@local_config_sycl//sycl:platform.bzl", "sycl_library_path")
 load("@local_config_sycl//sycl:build_defs.bzl", "if_ccpp")
 
 cc_library(
@@ -114,6 +113,43 @@ cc_library(
 )
 
 cc_library(
+    name = "base",
+    srcs = [],
+    copts = tf_copts(),
+)
+
+cc_library(
+    name = "port",
+    srcs = [],
+    copts = tf_copts(),
+)
+
+cc_library(
+    name = "protobuf",
+    srcs = [],
+    copts = tf_copts(),
+)
+
+cc_library(
+    name = "env",
+    srcs = [],
+    copts = tf_copts(),
+)
+
+cc_library(
+    name = "other",
+    srcs = [],
+    copts = tf_copts(),
+    deps = [
+        "@com_googlesource_code_re2//:re2",
+        "@farmhash_archive//:farmhash",
+        "@fft2d",
+        "@highwayhash//:sip_hash",
+        "@png_archive//:png",
+    ],
+)
+
+cc_library(
     name = "platformlib",
     copts = tf_copts(),
     deps = [
@@ -126,6 +162,11 @@ cc_library(
         "@highwayhash//:sip_hash",
         "@png_archive//:png",
     ],
+)
+
+cc_library(
+    name = "stacktrace",
+    srcs = [],
 )
 
 cc_library(
@@ -161,6 +202,13 @@ cc_library(
 )
 
 cc_library(
+    name = "test_lite_main",
+    testonly = 1,
+    linkstatic = 1,
+    deps = [],
+)
+
+cc_library(
     name = "test_main",
     testonly = 1,
     linkstatic = 1,
@@ -193,20 +241,6 @@ cc_library(
     ],
 )
 
-cc_library(
-    name = "sycl",
-    data = if_ccpp([
-        "@local_config_sycl//sycl:{}".format(sycl_library_path("ComputeCpp")),
-    ]),
-    linkopts = if_ccpp([
-        "-Wl,-rpath,../local_config_sycl/sycl/lib",
-    ]),
-    deps = if_ccpp(
-        ["@local_config_sycl//sycl:syclrt"],
-        ["@local_config_sycl//sycl:sycl_headers"],
-    ),
-)
-
 filegroup(
     name = "mobile_srcs",
     srcs = glob(["*.h"]),
@@ -217,16 +251,4 @@ alias(
     name = "android_srcs",
     actual = ":mobile_srcs",
     visibility = ["//visibility:public"],
-)
-
-filegroup(
-    name = "all_files",
-    srcs = glob(
-        ["**/*"],
-        exclude = [
-            "**/METADATA",
-            "**/OWNERS",
-        ],
-    ),
-    visibility = ["//tensorflow:__subpackages__"],
 )

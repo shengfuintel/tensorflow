@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#if !TENSORFLOW_USE_SYCL
+#ifndef TENSORFLOW_USE_SYCL
 #error This file must only be included when building with SYCL support
 #endif
 

@@ -20,7 +20,7 @@ namespace tensorflow {
 REGISTER_KERNEL_BUILDER(Name("NoOp").Device(DEVICE_CPU), NoOp);
 REGISTER_KERNEL_BUILDER(Name("NoOp").Device(DEVICE_GPU), NoOp);
 
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 REGISTER_KERNEL_BUILDER(Name("NoOp").Device(DEVICE_SYCL), NoOp);
 #endif
 

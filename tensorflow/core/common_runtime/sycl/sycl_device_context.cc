@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 
@@ -99,6 +99,11 @@ void SYCLDeviceContext::CopyCPUTensorToDevice(const Tensor *cpu_tensor,
       case DT_BOOL:
         device->eigen_sycl_device()->memcpyHostToDevice(
             static_cast<bool *>(dst_ptr), static_cast<const bool *>(src_ptr),
+            total_bytes);
+        break;
+      case DT_VARIANT:
+        device->eigen_sycl_device()->memcpyHostToDevice(
+            static_cast<Variant *>(dst_ptr), static_cast<const Variant *>(src_ptr),
             total_bytes);
         break;
       default:
@@ -187,6 +192,11 @@ void SYCLDeviceContext::CopyDeviceTensorToCPU(const Tensor *device_tensor,
       case DT_BOOL:
         device->eigen_sycl_device()->memcpyDeviceToHost(
             static_cast<bool *>(dst_ptr), static_cast<const bool *>(src_ptr),
+            total_bytes);
+        break;
+      case DT_VARIANT:
+        device->eigen_sycl_device()->memcpyDeviceToHost(
+            static_cast<Variant *>(dst_ptr), static_cast<const Variant *>(src_ptr),
             total_bytes);
         break;
       default:

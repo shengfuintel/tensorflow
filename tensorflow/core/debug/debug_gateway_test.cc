@@ -53,6 +53,7 @@ class SessionDebugMinusAXTest : public ::testing::Test {
   void Initialize(std::initializer_list<float> a_values) {
     Graph graph(OpRegistry::Global());
 
+//TODO(codeplay): temporary fix, this would fail if SYCL and CUDA are both enabled
 #if GOOGLE_CUDA
     const string kDeviceName = "/job:localhost/replica:0/task:0/device:GPU:0";
 #elif defined(TENSORFLOW_USE_SYCL)
@@ -312,6 +313,7 @@ TEST_F(SessionDebugMinusAXTest, RunSimpleNetworkWithTwoDebugNodesInserted) {
 
 // Verify the correct number of partition graphs (GraphDefs) outputted
 // through RunMetadata, given whether GPU is involved.
+//TODO(codeplay): temporary fix, this would fail if SYCL and CUDA are both enabled
 #if GOOGLE_CUDA
   ASSERT_EQ(2, run_metadata.partition_graphs().size());
 #elif defined(TENSORFLOW_USE_SYCL)
@@ -511,6 +513,7 @@ class SessionDebugOutputSlotWithoutOutgoingEdgeTest : public ::testing::Test {
   void Initialize() {
     Graph graph(OpRegistry::Global());
 
+//TODO(codeplay): temporary fix, this would fail if SYCL and CUDA are both enabled
 #if GOOGLE_CUDA
     const string kDeviceName = "/job:localhost/replica:0/task:0/device:GPU:0";
 #elif defined(TENSORFLOW_USE_SYCL)
@@ -613,6 +616,7 @@ class SessionDebugVariableTest : public ::testing::Test {
   void Initialize() {
     Graph graph(OpRegistry::Global());
 
+//TODO(codeplay): temporary fix, this would fail if SYCL and CUDA are both enabled
 #if GOOGLE_CUDA
     const string kDeviceName = "/job:localhost/replica:0/task:0/device:GPU:0";
 #elif defined(TENSORFLOW_USE_SYCL)
@@ -838,6 +842,7 @@ TEST_F(SessionDebugVariableTest, VariableAssignWithDebugOps) {
                    &run_metadata);
   TF_ASSERT_OK(s);
 
+//TODO(codeplay): temporary fix, this would fail if SYCL and CUDA are both enabled
 #if GOOGLE_CUDA
   ASSERT_EQ(2, run_metadata.partition_graphs().size());
 #elif defined(TENSORFLOW_USE_SYCL)
@@ -885,9 +890,10 @@ class SessionDebugGPUSwitchTest : public ::testing::Test {
   void Initialize() {
     Graph graph(OpRegistry::Global());
 
+//TODO(codeplay): temporary fix, this would fail if SYCL and CUDA are both enabled
 #ifdef GOOGLE_CUDA
     const string kDeviceName = "/job:localhost/replica:0/task:0/device:GPU:0";
-#elif TENSORFLOW_USE_SYCL
+#elif defined(TENSORFLOW_USE_SYCL)
     const string kDeviceName = "/job:localhost/replica:0/task:0/device:SYCL:0";
 #endif
 

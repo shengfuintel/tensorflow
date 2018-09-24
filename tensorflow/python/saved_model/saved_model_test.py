@@ -53,12 +53,9 @@ def tearDownModule():
   file_io.delete_recursively(test.get_temp_dir())
 
 
-@test_util.with_c_api
 class SavedModelTest(test.TestCase):
 
   def _get_export_dir(self, label):
-    if ops._USE_C_API:
-      label += "_c_api"
     return os.path.join(test.get_temp_dir(), label)
 
   def _init_and_validate_variable(self, sess, variable_name, variable_value):
@@ -67,9 +64,12 @@ class SavedModelTest(test.TestCase):
     self.assertEqual(variable_value, v.eval())
 
   def _build_asset_collection(self, asset_file_name, asset_file_contents,
-                              asset_file_tensor_name):
+                              asset_file_tensor_name, asset_subdir=""):
+    parent_dir = os.path.join(
+        compat.as_bytes(test.get_temp_dir()), compat.as_bytes(asset_subdir))
+    file_io.recursive_create_dir(parent_dir)
     asset_filepath = os.path.join(
-        compat.as_bytes(test.get_temp_dir()), compat.as_bytes(asset_file_name))
+        compat.as_bytes(parent_dir), compat.as_bytes(asset_file_name))
     file_io.write_string_to_file(asset_filepath, asset_file_contents)
     asset_file_tensor = constant_op.constant(
         asset_filepath, name=asset_file_tensor_name)
@@ -80,10 +80,11 @@ class SavedModelTest(test.TestCase):
   def _validate_asset_collection(self, export_dir, graph_collection_def,
                                  expected_asset_file_name,
                                  expected_asset_file_contents,
-                                 expected_asset_tensor_name):
+                                 expected_asset_tensor_name,
+                                 asset_id=0):
     assets_any = graph_collection_def[constants.ASSETS_KEY].any_list.value
     asset = meta_graph_pb2.AssetFileDef()
-    assets_any[0].Unpack(asset)
+    assets_any[asset_id].Unpack(asset)
     assets_path = os.path.join(
         compat.as_bytes(export_dir),
         compat.as_bytes(constants.ASSETS_DIRECTORY),
@@ -94,7 +95,7 @@ class SavedModelTest(test.TestCase):
     self.assertEqual(expected_asset_file_name, asset.filename)
     self.assertEqual(expected_asset_tensor_name, asset.tensor_info.name)
 
-  def _validate_inputs_tensor_info(self, builder, tensor_info):
+  def _validate_inputs_tensor_info_fail(self, builder, tensor_info):
     with self.test_session(graph=ops.Graph()) as sess:
       self._init_and_validate_variable(sess, "v", 42)
 
@@ -107,7 +108,18 @@ class SavedModelTest(test.TestCase):
           sess, ["foo"],
           signature_def_map={"foo_key": foo_signature})
 
-  def _validate_outputs_tensor_info(self, builder, tensor_info):
+  def _validate_inputs_tensor_info_accept(self, builder, tensor_info):
+    with self.test_session(graph=ops.Graph()) as sess:
+      self._init_and_validate_variable(sess, "v", 42)
+
+      foo_signature = signature_def_utils.build_signature_def({
+          "foo_inputs": tensor_info
+      }, dict(), "foo")
+      builder.add_meta_graph_and_variables(
+          sess, ["foo"],
+          signature_def_map={"foo_key": foo_signature})
+
+  def _validate_outputs_tensor_info_fail(self, builder, tensor_info):
     with self.test_session(graph=ops.Graph()) as sess:
       self._init_and_validate_variable(sess, "v", 42)
 
@@ -116,6 +128,16 @@ class SavedModelTest(test.TestCase):
       self.assertRaises(
           AssertionError,
           builder.add_meta_graph_and_variables,
+          sess, ["foo"],
+          signature_def_map={"foo_key": foo_signature})
+
+  def _validate_outputs_tensor_info_accept(self, builder, tensor_info):
+    with self.test_session(graph=ops.Graph()) as sess:
+      self._init_and_validate_variable(sess, "v", 42)
+
+      foo_signature = signature_def_utils.build_signature_def(
+          dict(), {"foo_outputs": tensor_info}, "foo")
+      builder.add_meta_graph_and_variables(
           sess, ["foo"],
           signature_def_map={"foo_key": foo_signature})
 
@@ -538,23 +560,50 @@ class SavedModelTest(test.TestCase):
       self.assertEqual("bar", bar_signature["bar_key"].method_name)
       self.assertEqual("foo_new", bar_signature["foo_key"].method_name)
 
-  def testSignatureDefValidation(self):
-    export_dir = self._get_export_dir("test_signature_def_validation")
+  def testSignatureDefValidationFails(self):
+    export_dir = self._get_export_dir("test_signature_def_validation_fail")
     builder = saved_model_builder.SavedModelBuilder(export_dir)
 
-    tensor_without_name = meta_graph_pb2.TensorInfo()
-    tensor_without_name.dtype = types_pb2.DT_FLOAT
-    self._validate_inputs_tensor_info(builder, tensor_without_name)
-    self._validate_outputs_tensor_info(builder, tensor_without_name)
+    tensor_without_encoding = meta_graph_pb2.TensorInfo()
+    tensor_without_encoding.dtype = types_pb2.DT_FLOAT
+    self._validate_inputs_tensor_info_fail(builder, tensor_without_encoding)
+    self._validate_outputs_tensor_info_fail(builder, tensor_without_encoding)
 
     tensor_without_dtype = meta_graph_pb2.TensorInfo()
     tensor_without_dtype.name = "x"
-    self._validate_inputs_tensor_info(builder, tensor_without_dtype)
-    self._validate_outputs_tensor_info(builder, tensor_without_dtype)
+    self._validate_inputs_tensor_info_fail(builder, tensor_without_dtype)
+    self._validate_outputs_tensor_info_fail(builder, tensor_without_dtype)
 
     tensor_empty = meta_graph_pb2.TensorInfo()
-    self._validate_inputs_tensor_info(builder, tensor_empty)
-    self._validate_outputs_tensor_info(builder, tensor_empty)
+    self._validate_inputs_tensor_info_fail(builder, tensor_empty)
+    self._validate_outputs_tensor_info_fail(builder, tensor_empty)
+
+  def testSignatureDefValidationSucceedsWithName(self):
+    tensor_with_name = meta_graph_pb2.TensorInfo()
+    tensor_with_name.name = "foo"
+    tensor_with_name.dtype = types_pb2.DT_FLOAT
+
+    export_dir = self._get_export_dir("test_signature_def_validation_name_1")
+    builder = saved_model_builder.SavedModelBuilder(export_dir)
+    self._validate_inputs_tensor_info_accept(builder, tensor_with_name)
+
+    export_dir = self._get_export_dir("test_signature_def_validation_name_2")
+    builder = saved_model_builder.SavedModelBuilder(export_dir)
+    self._validate_outputs_tensor_info_accept(builder, tensor_with_name)
+
+  def testSignatureDefValidationSucceedsWithCoo(self):
+    tensor_with_coo = meta_graph_pb2.TensorInfo()
+    # TODO(soergel) test validation of each of the fields of coo_sparse
+    tensor_with_coo.coo_sparse.values_tensor_name = "foo"
+    tensor_with_coo.dtype = types_pb2.DT_FLOAT
+
+    export_dir = self._get_export_dir("test_signature_def_validation_coo_1")
+    builder = saved_model_builder.SavedModelBuilder(export_dir)
+    self._validate_inputs_tensor_info_accept(builder, tensor_with_coo)
+
+    export_dir = self._get_export_dir("test_signature_def_validation_coo_2")
+    builder = saved_model_builder.SavedModelBuilder(export_dir)
+    self._validate_outputs_tensor_info_accept(builder, tensor_with_coo)
 
   def testAssets(self):
     export_dir = self._get_export_dir("test_assets")
@@ -588,6 +637,141 @@ class SavedModelTest(test.TestCase):
           compat.as_bytes(constants.ASSETS_DIRECTORY),
           compat.as_bytes("ignored.txt"))
       self.assertFalse(file_io.file_exists(ignored_asset_path))
+
+  def testAssetsNameCollisionDiffFile(self):
+    export_dir = self._get_export_dir("test_assets_name_collision_diff_file")
+    builder = saved_model_builder.SavedModelBuilder(export_dir)
+
+    with self.test_session(graph=ops.Graph()) as sess:
+      self._init_and_validate_variable(sess, "v", 42)
+
+      asset_collection = self._build_asset_collection(
+          "hello42.txt", "foo bar bak", "asset_file_tensor",
+          asset_subdir="1")
+
+      asset_collection = self._build_asset_collection(
+          "hello42.txt", "foo bar baz", "asset_file_tensor_1",
+          asset_subdir="2")
+
+      builder.add_meta_graph_and_variables(
+          sess, ["foo"], assets_collection=asset_collection)
+
+    # Save the SavedModel to disk.
+    builder.save()
+
+    with self.test_session(graph=ops.Graph()) as sess:
+      foo_graph = loader.load(sess, ["foo"], export_dir)
+      self._validate_asset_collection(export_dir, foo_graph.collection_def,
+                                      "hello42.txt", "foo bar bak",
+                                      "asset_file_tensor:0")
+      self._validate_asset_collection(export_dir, foo_graph.collection_def,
+                                      "hello42.txt_1", "foo bar baz",
+                                      "asset_file_tensor_1:0",
+                                      asset_id=1)
+
+  def testAssetsNameCollisionSameFilepath(self):
+    export_dir = self._get_export_dir("test_assets_name_collision_same_path")
+    builder = saved_model_builder.SavedModelBuilder(export_dir)
+
+    with self.test_session(graph=ops.Graph()) as sess:
+      self._init_and_validate_variable(sess, "v", 42)
+
+      asset_collection = self._build_asset_collection(
+          "hello42.txt", "foo bar baz", "asset_file_tensor")
+
+      asset_collection = self._build_asset_collection(
+          "hello42.txt", "foo bar baz", "asset_file_tensor_1")
+
+      builder.add_meta_graph_and_variables(
+          sess, ["foo"], assets_collection=asset_collection)
+
+    # Save the SavedModel to disk.
+    builder.save()
+
+    with self.test_session(graph=ops.Graph()) as sess:
+      foo_graph = loader.load(sess, ["foo"], export_dir)
+      self._validate_asset_collection(export_dir, foo_graph.collection_def,
+                                      "hello42.txt", "foo bar baz",
+                                      "asset_file_tensor:0")
+      # The second tensor should be recorded, but the same.
+      self._validate_asset_collection(export_dir, foo_graph.collection_def,
+                                      "hello42.txt", "foo bar baz",
+                                      "asset_file_tensor_1:0",
+                                      asset_id=1)
+      ignored_asset_path = os.path.join(
+          compat.as_bytes(export_dir),
+          compat.as_bytes(constants.ASSETS_DIRECTORY),
+          compat.as_bytes("hello42.txt_1"))
+      self.assertFalse(file_io.file_exists(ignored_asset_path))
+
+  def testAssetsNameCollisionSameFile(self):
+    export_dir = self._get_export_dir("test_assets_name_collision_same_file")
+    builder = saved_model_builder.SavedModelBuilder(export_dir)
+
+    with self.test_session(graph=ops.Graph()) as sess:
+      self._init_and_validate_variable(sess, "v", 42)
+
+      asset_collection = self._build_asset_collection(
+          "hello42.txt", "foo bar baz", "asset_file_tensor",
+          asset_subdir="1")
+
+      asset_collection = self._build_asset_collection(
+          "hello42.txt", "foo bar baz", "asset_file_tensor_1",
+          asset_subdir="2")
+
+      builder.add_meta_graph_and_variables(
+          sess, ["foo"], assets_collection=asset_collection)
+
+    # Save the SavedModel to disk.
+    builder.save()
+
+    with self.test_session(graph=ops.Graph()) as sess:
+      foo_graph = loader.load(sess, ["foo"], export_dir)
+      self._validate_asset_collection(export_dir, foo_graph.collection_def,
+                                      "hello42.txt", "foo bar baz",
+                                      "asset_file_tensor:0")
+      # The second tensor should be recorded, but the same.
+      self._validate_asset_collection(export_dir, foo_graph.collection_def,
+                                      "hello42.txt", "foo bar baz",
+                                      "asset_file_tensor_1:0",
+                                      asset_id=1)
+      ignored_asset_path = os.path.join(
+          compat.as_bytes(export_dir),
+          compat.as_bytes(constants.ASSETS_DIRECTORY),
+          compat.as_bytes("hello42.txt_1"))
+      self.assertFalse(file_io.file_exists(ignored_asset_path))
+
+  def testAssetsNameCollisionManyFiles(self):
+    export_dir = self._get_export_dir("test_assets_name_collision_many_files")
+    builder = saved_model_builder.SavedModelBuilder(export_dir)
+
+    with self.test_session(graph=ops.Graph()) as sess:
+      self._init_and_validate_variable(sess, "v", 42)
+
+      for i in range(5):
+        idx = str(i)
+        asset_collection = self._build_asset_collection(
+            "hello42.txt", "foo bar baz " + idx, "asset_file_tensor_" + idx,
+            asset_subdir=idx)
+
+      builder.add_meta_graph_and_variables(
+          sess, ["foo"], assets_collection=asset_collection)
+
+    # Save the SavedModel to disk.
+    builder.save()
+
+    with self.test_session(graph=ops.Graph()) as sess:
+      foo_graph = loader.load(sess, ["foo"], export_dir)
+      for i in range(1, 5):
+        idx = str(i)
+        self._validate_asset_collection(
+            export_dir, foo_graph.collection_def, "hello42.txt_" + idx,
+            "foo bar baz " + idx, "asset_file_tensor_{}:0".format(idx),
+            asset_id=i)
+
+      self._validate_asset_collection(export_dir, foo_graph.collection_def,
+                                      "hello42.txt", "foo bar baz 0",
+                                      "asset_file_tensor_0:0")
 
   def testCustomMainOp(self):
     export_dir = self._get_export_dir("test_main_op")
@@ -685,6 +869,96 @@ class SavedModelTest(test.TestCase):
       with self.assertRaises(AssertionError):
         builder.add_meta_graph_and_variables(
             sess, ["foo"], legacy_init_op=legacy_init_op)
+
+  def testTrainOp(self):
+    export_dir = self._get_export_dir("test_train_op")
+    builder = saved_model_builder.SavedModelBuilder(export_dir)
+
+    with self.test_session(graph=ops.Graph()) as sess:
+      # Add `v1` and `v2` variables to the graph.
+      v1 = variables.Variable(1, name="v1")
+      ops.add_to_collection("v", v1)
+      v2 = variables.Variable(2, name="v2")
+      ops.add_to_collection("v", v2)
+
+      sess.run(variables.global_variables_initializer())
+      train_op = state_ops.assign_add(v1, v2)
+
+      sess.run(train_op)
+      # TODO(karmel): remove explicit call when in the public method.
+      builder._add_train_op(train_op)
+      builder.add_meta_graph_and_variables(sess, ["foo"])
+
+    # Save the SavedModel to disk.
+    builder.save()
+
+    with self.test_session(graph=ops.Graph()) as sess:
+      loader.load(sess, ["foo"], export_dir)
+      self.assertEqual(3, ops.get_collection("v")[0].eval())
+      self.assertEqual(2, ops.get_collection("v")[1].eval())
+      self.assertIsInstance(
+          ops.get_collection(constants.TRAIN_OP_KEY)[0], ops.Tensor)
+
+  def testTrainOpGroup(self):
+    export_dir = self._get_export_dir("test_train_op_group")
+    builder = saved_model_builder.SavedModelBuilder(export_dir)
+
+    with self.test_session(graph=ops.Graph()) as sess:
+      # Add `v1` and `v2` variables to the graph.
+      v1 = variables.Variable(1, name="v1")
+      ops.add_to_collection("v", v1)
+      v2 = variables.Variable(2, name="v2")
+      ops.add_to_collection("v", v2)
+
+      sess.run(variables.global_variables_initializer())
+      train_op = control_flow_ops.group()
+
+      sess.run(train_op)
+      # TODO(karmel): remove explicit call when in the public method.
+      builder._add_train_op(train_op)
+      builder.add_meta_graph_and_variables(sess, ["foo"])
+
+    # Save the SavedModel to disk.
+    builder.save()
+
+    with self.test_session(graph=ops.Graph()) as sess:
+      loader.load(sess, ["foo"], export_dir)
+      self.assertEqual(1, ops.get_collection("v")[0].eval())
+      self.assertEqual(2, ops.get_collection("v")[1].eval())
+      self.assertIsInstance(
+          ops.get_collection(constants.TRAIN_OP_KEY)[0], ops.Operation)
+
+  def testTrainOpAfterVariables(self):
+    export_dir = self._get_export_dir("test_train_op_after_variables")
+    builder = saved_model_builder.SavedModelBuilder(export_dir)
+
+    with self.test_session(graph=ops.Graph()) as sess:
+      # Add `v1` and `v2` variables to the graph.
+      v1 = variables.Variable(1, name="v1")
+      ops.add_to_collection("v", v1)
+      v2 = variables.Variable(2, name="v2")
+      ops.add_to_collection("v", v2)
+
+      sess.run(variables.global_variables_initializer())
+      builder.add_meta_graph_and_variables(sess, ["pre_foo"])
+
+      train_op = state_ops.assign_add(v1, v2)
+      sess.run(train_op)
+      # TODO(karmel): remove explicit call when in the public method.
+      builder._add_train_op(train_op)
+      builder.add_meta_graph(["foo"])
+
+    # Save the SavedModel to disk.
+    builder.save()
+
+    with self.test_session(graph=ops.Graph()) as sess:
+      loader.load(sess, ["foo"], export_dir)
+      self.assertIsInstance(
+          ops.get_collection(constants.TRAIN_OP_KEY)[0], ops.Tensor)
+
+    with self.test_session(graph=ops.Graph()) as sess:
+      loader.load(sess, ["pre_foo"], export_dir)
+      self.assertFalse(ops.get_collection(constants.TRAIN_OP_KEY))
 
   def testMultipleAssets(self):
     export_dir = self._get_export_dir("test_multiple_assets")
@@ -980,12 +1254,8 @@ class SavedModelTest(test.TestCase):
     # does not have any attr values for the "TestAttr" node, and there is no
     # default specified in the TestAttr OpDef.
     sess = session.Session(graph=ops.Graph())
-    if ops._USE_C_API:
-      error_message = "NodeDef missing attr 'T' from Op<name=TestAttr"
-    else:
-      error_message = ("Expected one attr with name .*T(out)?.* in name: "
-                       "\"test_attr\".*")
-    with self.assertRaisesRegexp(ValueError, error_message):
+    with self.assertRaisesRegexp(
+        ValueError, "NodeDef missing attr 'T' from Op<name=TestAttr"):
       loader.load(sess, ["foo"], export_dir)
 
     # Rewrite the SavedModel to change the type of the T attr in "test_attr"

@@ -99,6 +99,7 @@ void LSTMBlockCellFpropWithEigen(
   }
 
   // cs = ci .* i + f .* cs_prev
+//TODO(codeplay): investigate more why this is needed on some device
 #ifdef TENSORFLOW_USE_SYCL
   cs.device(d) = cs_prev;
   cs.device(d) = cs * f + i * ci;

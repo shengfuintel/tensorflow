@@ -18,6 +18,8 @@ limitations under the License.
 #include <vector>
 
 #include "tensorflow/core/framework/graph.pb.h"
+#include "tensorflow/core/grappler/clusters/cluster.h"
+#include "tensorflow/core/grappler/costs/graph_properties.h"
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/types.h"
 
@@ -28,15 +30,29 @@ namespace tensorflow {
 namespace tensorrt {
 namespace convert {
 
+// This method converts an already generated calibration graph which was used in
+// calibration runs to an inference graph
+tensorflow::Status ConvertCalibGraphToInferGraph(
+    const tensorflow::GraphDef& graph_def, tensorflow::GraphDef* new_graph_def);
+
 // max_batch_size: maximum batch size which can be used for inference for
 //                 optimization targets inference run with max batch size.
-// max_workspace_size_bytes: The upper bound of memory allowence for
+// max_workspace_size_bytes: The upper bound of memory allowance for
 //                 engine building.
 tensorflow::Status ConvertGraphDefToTensorRT(
     const tensorflow::GraphDef& graph_def,
     const std::vector<string>& output_names, size_t max_batch_size,
-    size_t max_workspace_size_bytes, tensorflow::GraphDef* new_graph_def);
+    size_t max_workspace_size_bytes, tensorflow::GraphDef* new_graph_def,
+    int precision_mode, int minimum_segment_size);
 
+// Method to call from optimization pass
+tensorflow::Status ConvertAfterShapes(
+    const tensorflow::GraphDef& graph, const std::vector<string>& output_names,
+    size_t max_batch_size, size_t max_workspace_size_bytes,
+    tensorflow::GraphDef* new_graph_def, int precision_mode,
+    int minimum_segment_size,
+    const tensorflow::grappler::GraphProperties& graph_properties,
+    const tensorflow::grappler::Cluster* cluster);
 }  // namespace convert
 }  // namespace tensorrt
 }  // namespace tensorflow

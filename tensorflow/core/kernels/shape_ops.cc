@@ -443,7 +443,7 @@ REGISTER_KERNEL_BUILDER(Name("Squeeze")
                         SqueezeOp);
 #endif  // GOOGLE_CUDA
 
-#if TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_SYCL
 #define REGISTER_SYCL_KERNEL(type)                                   \
   REGISTER_KERNEL_BUILDER(                                           \
       Name("Squeeze").Device(DEVICE_SYCL).TypeConstraint<type>("T"), \

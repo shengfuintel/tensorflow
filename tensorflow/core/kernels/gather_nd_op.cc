@@ -31,6 +31,9 @@ namespace tensorflow {
 
 typedef Eigen::ThreadPoolDevice CPUDevice;
 typedef Eigen::GpuDevice GPUDevice;
+#ifdef TENSORFLOW_USE_SYCL
+typedef Eigen::SyclDevice SYCLDevice;
+#endif  // TENSORFLOW_USE_SYCL
 
 template <typename Device, typename T, typename Index>
 class GatherNdOp : public OpKernel {
@@ -228,6 +231,8 @@ namespace functor {
   DECLARE_GPU_SPECS_INDEX(T, int32); \
   DECLARE_GPU_SPECS_INDEX(T, int64)
 
+TF_CALL_int32(DECLARE_GPU_SPECS);
+TF_CALL_int64(DECLARE_GPU_SPECS);
 TF_CALL_GPU_NUMBER_TYPES(DECLARE_GPU_SPECS);
 TF_CALL_complex64(DECLARE_GPU_SPECS);
 TF_CALL_complex128(DECLARE_GPU_SPECS);
@@ -239,6 +244,8 @@ TF_CALL_complex128(DECLARE_GPU_SPECS);
 // Registration of the GPU implementations.
 #define REGISTER_GATHER_ND_GPU(type) REGISTER_GATHER_ND_ALL_INDICES(GPU, type)
 
+TF_CALL_int32(REGISTER_GATHER_ND_GPU);
+TF_CALL_int64(REGISTER_GATHER_ND_GPU);
 TF_CALL_GPU_NUMBER_TYPES(REGISTER_GATHER_ND_GPU);
 TF_CALL_complex64(REGISTER_GATHER_ND_GPU);
 TF_CALL_complex128(REGISTER_GATHER_ND_GPU);
@@ -246,6 +253,32 @@ TF_CALL_complex128(REGISTER_GATHER_ND_GPU);
 #undef REGISTER_GATHER_ND_GPU
 
 #endif  // GOOGLE_CUDA
+
+#ifdef TENSORFLOW_USE_SYCL
+
+#define REGISTER_GATHER_ND_FULL_SYCL(type, index_type)                 \
+  REGISTER_KERNEL_BUILDER(Name("GatherNd")                             \
+                              .Device(DEVICE_SYCL)                     \
+                              .TypeConstraint<type>("Tparams")         \
+                              .TypeConstraint<index_type>("Tindices")  \
+                              .HostMemory("indices"),                  \
+                          GatherNdOp<SYCLDevice, type, index_type>)
+
+#define REGISTER_GATHER_ND_ALL_INDICES_SYCL(type) \
+  REGISTER_GATHER_ND_FULL_SYCL(type, int32);      \
+  REGISTER_GATHER_ND_FULL_SYCL(type, int64)
+
+#define REGISTER_GATHER_ND_SYCL(type) \
+  REGISTER_GATHER_ND_ALL_INDICES_SYCL(type)
+
+TF_CALL_INTEGRAL_TYPES(REGISTER_GATHER_ND_SYCL);
+TF_CALL_SYCL_NUMBER_TYPES(REGISTER_GATHER_ND_SYCL);
+
+#undef REGISTER_GATHER_ND_SYCL
+#undef REGISTER_GATHER_ND_ALL_INDICES_SYCL
+#undef REGISTER_GATHER_ND_FULL_SYCL
+
+#endif  // TENSORFLOW_USE_SYCL
 
 #undef REGISTER_GATHER_ND_ALL_INDICES
 #undef REGISTER_GATHER_ND_FULL

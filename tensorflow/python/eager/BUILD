@@ -25,12 +25,14 @@ cc_library(
         "//tensorflow/c/eager:c_api_internal",
         "//tensorflow/c/eager:tape",
         "//tensorflow/core:lib",
+        "//tensorflow/core:protos_all_cc",
+        "//tensorflow/python:cpp_python_util",
         "//tensorflow/python:ndarray_tensor",
         "//tensorflow/python:ndarray_tensor_bridge",
         "//tensorflow/python:numpy_lib",
         "//tensorflow/python:py_seq_tensor",
         "//tensorflow/python:safe_ptr",
-        "//util/python:python_headers",
+        "//third_party/python_runtime:headers",
     ],
 )
 
@@ -42,7 +44,6 @@ py_library(
         ":backprop",
         ":context",
         ":core",
-        ":custom_gradient",
         ":execute",
         ":function",
         ":graph_callable",
@@ -103,10 +104,10 @@ cuda_py_test(
     additional_deps = [
         ":backprop",
         ":context",
-        ":custom_gradient",
         ":test",
         "//tensorflow/python:embedding_ops",
         "//tensorflow/python:array_ops",
+        "//tensorflow/python:control_flow_ops",
         "//tensorflow/python:math_ops",
         "//tensorflow/python:nn_ops",
         "//tensorflow/python:resource_variable_ops",
@@ -143,6 +144,8 @@ cuda_py_test(
         ":tape",
         ":test",
         "//tensorflow/python:clip_ops",
+        "//tensorflow/python:init_ops",
+        "//tensorflow/python:layers",
         "//tensorflow/python:math_ops",
         "//tensorflow/python:resource_variable_ops",
     ],
@@ -187,37 +190,6 @@ py_library(
         ":context",
         "//tensorflow/python:pywrap_tensorflow",
         "//third_party/py/numpy",
-    ],
-)
-
-cc_library(
-    name = "python_eager_op_gen",
-    srcs = ["python_eager_op_gen.cc"],
-    hdrs = ["python_eager_op_gen.h"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//tensorflow/core:framework",
-        "//tensorflow/core:lib",
-        "//tensorflow/core:lib_internal",
-        "//tensorflow/core:op_gen_lib",
-        "//tensorflow/core:proto_text",
-        "//tensorflow/core:protos_all_cc",
-        "//tensorflow/python:python_op_gen",
-    ],
-)
-
-py_library(
-    name = "custom_gradient",
-    srcs = ["custom_gradient.py"],
-    srcs_version = "PY2AND3",
-    visibility = ["//tensorflow:internal"],
-    deps = [
-        ":context",
-        ":tape",
-        "//tensorflow/python:array_ops",
-        "//tensorflow/python:framework_ops",
-        "//tensorflow/python:resource_variable_ops",
-        "//tensorflow/python:util",
     ],
 )
 
@@ -364,7 +336,6 @@ py_test(
     deps = [
         ":backprop",
         ":context",
-        ":custom_gradient",
         ":test",
         "//tensorflow/python:array_ops",
         "//tensorflow/python:constant_op",
@@ -413,21 +384,6 @@ py_test(
         "//tensorflow/python:random_ops",
         "//third_party/py/numpy",
     ],
-)
-
-# -----------------------------------------------------------------------------
-# Google-internal targets.
-
-filegroup(
-    name = "all_files",
-    srcs = glob(
-        ["**/*"],
-        exclude = [
-            "**/METADATA",
-            "**/OWNERS",
-        ],
-    ),
-    visibility = ["//tensorflow:__subpackages__"],
 )
 
 py_library(

@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 #include "tensorflow/compiler/xla/service/gpu/cudnn_convolution_algorithm_picker.h"
+#include "tensorflow/compiler/xla/service/gpu/backend_configs.pb.h"
 #include "tensorflow/compiler/xla/service/gpu/convolution_thunk.h"
 #include "tensorflow/compiler/xla/service/gpu/ir_emission_utils.h"
 #include "tensorflow/core/lib/gtl/optional.h"
@@ -23,8 +24,6 @@ limitations under the License.
 namespace xla {
 namespace gpu {
 namespace {
-
-namespace se = perftools::gputools;
 
 using se::DeviceMemoryBase;
 using se::dnn::AlgorithmConfig;
@@ -37,35 +36,22 @@ class ScratchAllocator : public se::ScratchAllocator {
   ScratchAllocator(int device_ordinal, DeviceMemoryAllocator* memory_allocator)
       : device_ordinal_(device_ordinal), memory_allocator_(memory_allocator) {}
 
-  ~ScratchAllocator() override;
-
   int64 GetMemoryLimitInBytes(se::Stream* stream) override {
     return 1LL << 32;  // 4GB.  TODO(jlebar): Tune this?
   }
   int64 TotalAllocatedBytes() { return total_allocated_bytes_; }
 
-  se::port::StatusOr<se::DeviceMemory<uint8>> AllocateBytes(
-      se::Stream* stream, int64 byte_size) override;
+  StatusOr<se::DeviceMemory<uint8>> AllocateBytes(se::Stream* stream,
+                                                  int64 byte_size) override;
 
  private:
   const int device_ordinal_;
   DeviceMemoryAllocator* memory_allocator_;
-  std::vector<se::DeviceMemoryBase> allocated_buffers_;
+  std::vector<OwningDeviceMemory> allocated_buffers_;
   int64 total_allocated_bytes_ = 0;
 };
 
-ScratchAllocator::~ScratchAllocator() {
-  for (auto& allocated_buffer : allocated_buffers_) {
-    if (!memory_allocator_->Deallocate(device_ordinal_, &allocated_buffer)
-             .ok()) {
-      // The program can still continue with failed deallocation.
-      LOG(ERROR) << "Failed to deallocate the allocated buffer: "
-                 << allocated_buffer.opaque();
-    }
-  }
-}
-
-se::port::StatusOr<se::DeviceMemory<uint8>> ScratchAllocator::AllocateBytes(
+StatusOr<se::DeviceMemory<uint8>> ScratchAllocator::AllocateBytes(
     se::Stream* stream, int64 byte_size) {
   CHECK_GE(byte_size, 0) << "byte_size must be positive.";
   if (byte_size > GetMemoryLimitInBytes(stream)) {
@@ -76,29 +62,30 @@ se::port::StatusOr<se::DeviceMemory<uint8>> ScratchAllocator::AllocateBytes(
             byte_size, GetMemoryLimitInBytes(stream)));
   }
 
-  auto status_or_memory =
-      memory_allocator_->Allocate(device_ordinal_, byte_size,
-                                  /*retry_on_failure=*/false);
-  if (!status_or_memory.ok()) {
-    return se::port::Status(se::port::error::RESOURCE_EXHAUSTED,
-                            tensorflow::strings::Printf(
-                                "Failed to allocate %lld bytes on device %d.",
-                                byte_size, device_ordinal_));
-  }
-  se::DeviceMemoryBase allocated_buffer = status_or_memory.ValueOrDie();
-  allocated_buffers_.push_back(allocated_buffer);
+  TF_ASSIGN_OR_RETURN(OwningDeviceMemory allocated_buffer,
+                      memory_allocator_->Allocate(device_ordinal_, byte_size,
+                                                  /*retry_on_failure=*/false));
   total_allocated_bytes_ += byte_size;
-  return se::DeviceMemory<uint8>(allocated_buffer);
+
+  se::DeviceMemoryBase buffer_addr = allocated_buffer.AsDeviceMemoryBase();
+  allocated_buffers_.push_back(std::move(allocated_buffer));
+  return se::DeviceMemory<uint8>(buffer_addr);
 }
 
 // Determines whether we can safely perform a winograd non-fused convolution for
 // the given input and output shapes.  This works around b/68264959, an integer
 // overflow in cuDNNv5 and cuDNNv6.
-//
-// TODO(jlebar): We shouldn't need this check for cuDNNv7.
-bool ShouldIncludeWinogradNonfusedAlgo(
-    const Shape& input_shape, const Shape& output_shape,
-    const ConvolutionDimensionNumbers& dnums) {
+bool ShouldIncludeWinogradNonfusedAlgo(const Shape& input_shape,
+                                       const Shape& output_shape,
+                                       const ConvolutionDimensionNumbers& dnums,
+                                       se::StreamExecutor* stream_exec) {
+  // Skip this check for cudnn7 and newer.
+  auto version =
+      stream_exec->AsDnn()->GetVersion();
+  if (version.ok() && version.ValueOrDie().major_version() >= 7) {
+    return true;
+  }
+
   int64 batch = input_shape.dimensions(dnums.input_batch_dimension());
   int64 in_depths = input_shape.dimensions(dnums.input_feature_dimension());
   int64 in_rows = input_shape.dimensions(dnums.input_spatial_dimensions(0));
@@ -118,31 +105,22 @@ bool ShouldIncludeWinogradNonfusedAlgo(
 
 std::vector<AlgorithmDesc> GetAlgorithms(CudnnConvKind kind,
                                          bool with_winograd_nonfused,
-                                         se::StreamExecutor* stream_exec_) {
+                                         se::StreamExecutor* stream_exec) {
   std::vector<AlgorithmDesc> algorithms;
   switch (kind) {
     case CudnnConvKind::kBackwardFilter:
-      CHECK(stream_exec_->GetConvolveBackwardFilterAlgorithms(
+      CHECK(stream_exec->GetConvolveBackwardFilterAlgorithms(
           with_winograd_nonfused, &algorithms));
       break;
     case CudnnConvKind::kBackwardInput:
-      CHECK(stream_exec_->GetConvolveBackwardDataAlgorithms(
+      CHECK(stream_exec->GetConvolveBackwardDataAlgorithms(
           with_winograd_nonfused, &algorithms));
       break;
     case CudnnConvKind::kForward:
-      CHECK(stream_exec_->GetConvolveAlgorithms(with_winograd_nonfused,
-                                                &algorithms));
+      CHECK(stream_exec->GetConvolveAlgorithms(with_winograd_nonfused,
+                                               &algorithms));
       break;
   }
-
-  // Remove any algorithms with tensor math enabled.  These have lower precision
-  // than regular algorithms, and we don't yet have a way to turn this on/off in
-  // XLA.
-  algorithms.erase(std::remove_if(algorithms.begin(), algorithms.end(),
-                                  [&](const AlgorithmDesc& a) {
-                                    return a.tensor_ops_enabled();
-                                  }),
-                   algorithms.end());
 
   return algorithms;
 }
@@ -172,7 +150,7 @@ string NumBytesToString(int64 bytes) {
 // cache misses and doing extra work.  Overall, caching doesn't seem worth the
 // trouble, but we may want to revisit this if we ever find a model where
 // caching would speed up compilation a lot.
-optional<std::pair<int64, int64>>
+optional<std::tuple<int64, bool, int64>>
 CudnnConvolutionAlgorithmPicker::PickBestAlgorithm(
     CudnnConvKind kind, const Shape& input_shape, const Shape& filter_shape,
     const Shape& output_shape, const Window& window,
@@ -202,26 +180,47 @@ CudnnConvolutionAlgorithmPicker::PickBestAlgorithm(
   // We don't put any data in these buffers, because (in theory, anyway) the
   // speed of a conv isn't affected by the data being convolved.
   ScratchAllocator input_output_allocator(device_ordinal, allocator);
-  se::port::StatusOr<DeviceMemoryBase> input_buf =
+  StatusOr<DeviceMemoryBase> maybe_input_buf =
       input_output_allocator.AllocateBytes(&stream,
                                            ShapeUtil::ByteSizeOf(input_shape));
-  se::port::StatusOr<DeviceMemoryBase> filter_buf =
+  StatusOr<DeviceMemoryBase> maybe_filter_buf =
       input_output_allocator.AllocateBytes(&stream,
                                            ShapeUtil::ByteSizeOf(filter_shape));
-  se::port::StatusOr<DeviceMemoryBase> output_buf =
+  StatusOr<DeviceMemoryBase> maybe_output_buf =
       input_output_allocator.AllocateBytes(&stream,
                                            ShapeUtil::ByteSizeOf(output_shape));
-  if (!input_buf.ok() || !filter_buf.ok() || !output_buf.ok()) {
+  if (!maybe_input_buf.ok() || !maybe_filter_buf.ok() ||
+      !maybe_output_buf.ok()) {
     LOG(WARNING)
         << "Couldn't allocate space for input/filter/output of convolution "
         << instr->ToString() << ".  Falling back to default algorithm.";
     return nullopt;
   }
 
-  const bool use_winograd_nonfused =
-      ShouldIncludeWinogradNonfusedAlgo(input_shape, output_shape, dnums);
+  DeviceMemoryBase input_buf = maybe_input_buf.ValueOrDie();
+  DeviceMemoryBase filter_buf = maybe_filter_buf.ValueOrDie();
+  DeviceMemoryBase output_buf = maybe_output_buf.ValueOrDie();
+
+  // Although we don't have evidence this matters, zero out the buffers before
+  // autotuning.  It's conceivable that using uninitialized memory as the inputs
+  // might affect performance if e.g. the inputs contain denormals, and this is
+  // easy enough.
+  if (!stream.ThenMemZero(&input_buf, input_buf.size())
+           .ThenMemZero(&filter_buf, filter_buf.size())
+           .ThenMemZero(&output_buf, output_buf.size())
+           .BlockHostUntilDone()
+           .ok()) {
+    LOG(WARNING)
+        << "Couldn't zero out input/filter/output buffer for convolution "
+        << instr->ToString() << ".  Falling back to default algorithm.";
+    return nullopt;
+  }
+
+  const bool use_winograd_nonfused = ShouldIncludeWinogradNonfusedAlgo(
+      input_shape, output_shape, dnums, stream_exec_);
   se::dnn::ProfileResult best_result;
   int64 best_result_bytes_used = 0;
+
   for (const AlgorithmDesc& alg :
        GetAlgorithms(kind, use_winograd_nonfused, stream_exec_)) {
     ScratchAllocator scratch_allocator(device_ordinal, allocator);
@@ -231,9 +230,7 @@ CudnnConvolutionAlgorithmPicker::PickBestAlgorithm(
 
     bool launch_ok =
         RunCudnnConvolution(kind, input_shape, filter_shape, output_shape,
-                            se::DeviceMemory<float>(input_buf.ValueOrDie()),
-                            se::DeviceMemory<float>(filter_buf.ValueOrDie()),
-                            se::DeviceMemory<float>(output_buf.ValueOrDie()),
+                            input_buf, filter_buf, output_buf,
                             &scratch_allocator, window, dnums,
                             AlgorithmConfig(alg), &stream, &profile_result)
             .ok();
@@ -260,8 +257,9 @@ CudnnConvolutionAlgorithmPicker::PickBestAlgorithm(
             << AlgorithmToString(best_result.algorithm()) << ", takes "
             << best_result.elapsed_time_in_ms() << "ms, and uses "
             << best_result_bytes_used << "B of scratch memory.";
-    return std::make_pair(best_result.algorithm().algo_id(),
-                          best_result_bytes_used);
+    return std::make_tuple(best_result.algorithm().algo_id(),
+                           best_result.algorithm().tensor_ops_enabled(),
+                           best_result_bytes_used);
   }
 
   LOG(WARNING) << "All algorithms tried for convolution " << instr->ToString()
@@ -277,19 +275,19 @@ StatusOr<bool> CudnnConvolutionAlgorithmPicker::RunOnInstruction(
   const auto& lhs_shape = instr->operand(0)->shape();
   const auto& rhs_shape = instr->operand(1)->shape();
   const auto& conv_result_shape = instr->shape().tuple_shapes(0);
-  optional<std::pair<int64, int64>> alg_and_scratch_bytes;
+  optional<std::tuple<int64, bool, int64>> alg_scratch_and_tc;
   if (call_target == kCudnnConvForwardCallTarget) {
-    alg_and_scratch_bytes = PickBestAlgorithm(
+    alg_scratch_and_tc = PickBestAlgorithm(
         CudnnConvKind::kForward, /*input_shape=*/lhs_shape,
         /*filter_shape=*/rhs_shape, /*output_shape=*/conv_result_shape,
         instr->window(), instr->convolution_dimension_numbers(), instr);
   } else if (call_target == kCudnnConvBackwardInputCallTarget) {
-    alg_and_scratch_bytes = PickBestAlgorithm(
+    alg_scratch_and_tc = PickBestAlgorithm(
         CudnnConvKind::kBackwardInput, /*input_shape=*/conv_result_shape,
         /*filter_shape=*/rhs_shape, /*output_shape=*/lhs_shape, instr->window(),
         instr->convolution_dimension_numbers(), instr);
   } else if (call_target == kCudnnConvBackwardFilterCallTarget) {
-    alg_and_scratch_bytes = PickBestAlgorithm(
+    alg_scratch_and_tc = PickBestAlgorithm(
         CudnnConvKind::kBackwardFilter, /*input_shape=*/lhs_shape,
         /*filter_shape=*/conv_result_shape, /*output_shape=*/rhs_shape,
         instr->window(), instr->convolution_dimension_numbers(), instr);
@@ -298,17 +296,20 @@ StatusOr<bool> CudnnConvolutionAlgorithmPicker::RunOnInstruction(
                << instr->ToString();
   }
 
-  if (!alg_and_scratch_bytes.has_value()) {
+  if (!alg_scratch_and_tc.has_value()) {
     return false;
   }
 
   int64 algorithm;
+  bool tensor_ops_enabled;
   int64 scratch_bytes;
-  std::tie(algorithm, scratch_bytes) = *alg_and_scratch_bytes;
+
+  std::tie(algorithm, tensor_ops_enabled, scratch_bytes) = *alg_scratch_and_tc;
 
   VLOG(1) << "Setting cudnn conv to use algorithm " << algorithm << " and "
           << NumBytesToString(scratch_bytes)
-          << " of scratch memory: " << instr->ToString();
+          << " of scratch memory: " << instr->ToString()
+          << " tensor_ops_enabled: " << tensor_ops_enabled;
 
   // Replace instr with a new CustomCall which has the correct algorithm, and
   // whose output shape has the appropriate amount of scratch memory.
@@ -316,16 +317,20 @@ StatusOr<bool> CudnnConvolutionAlgorithmPicker::RunOnInstruction(
   Shape new_call_shape =
       ShapeUtil::MakeTupleShape({instr->shape().tuple_shapes(0),
                                  ShapeUtil::MakeShape(U8, {scratch_bytes})});
-  HloInstruction* algorithm_hlo = computation->AddInstruction(
-      HloInstruction::CreateConstant(Literal::CreateR0<int64>(algorithm)));
+
+  CudnnConvBackendConfig backend_config;
+  backend_config.set_algorithm(algorithm);
+  backend_config.set_tensor_ops_enabled(tensor_ops_enabled);
+
   HloInstruction* new_call =
       computation->AddInstruction(HloInstruction::CreateCustomCall(
           new_call_shape,
-          {instr->mutable_operand(0), instr->mutable_operand(1), algorithm_hlo},
+          {instr->mutable_operand(0), instr->mutable_operand(1)},
           instr->custom_call_target()));
   new_call->set_window(instr->window());
   new_call->set_convolution_dimension_numbers(
       instr->convolution_dimension_numbers());
+  TF_RETURN_IF_ERROR(new_call->set_backend_config(backend_config));
 
   // Repackage new_call so it has the same shape as the original call, namely
   // (conv_result, u8[0]).

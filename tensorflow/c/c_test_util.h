@@ -20,6 +20,7 @@ limitations under the License.
 
 #include <vector>
 #include "tensorflow/core/framework/attr_value.pb.h"
+#include "tensorflow/core/framework/function.pb.h"
 #include "tensorflow/core/framework/graph.pb.h"
 #include "tensorflow/core/framework/node_def.pb.h"
 #include "tensorflow/core/framework/types.pb.h"
@@ -44,8 +45,12 @@ TF_Tensor* Int32Tensor(int32_t v);
 
 TF_Tensor* DoubleTensor(double v);
 
+TF_Tensor* FloatTensor(float v);
+
 TF_Operation* Placeholder(TF_Graph* graph, TF_Status* s,
-                          const char* name = "feed");
+                          const char* name = "feed",
+                          TF_DataType dtype = TF_INT32,
+                          const std::vector<int64_t>& dims = {});
 
 TF_Operation* Const(TF_Tensor* t, TF_Graph* graph, TF_Status* s,
                     const char* name = "const");
@@ -54,6 +59,9 @@ TF_Operation* ScalarConst(int32_t v, TF_Graph* graph, TF_Status* s,
                           const char* name = "scalar");
 
 TF_Operation* ScalarConst(double v, TF_Graph* graph, TF_Status* s,
+                          const char* name = "scalar");
+
+TF_Operation* ScalarConst(float v, TF_Graph* graph, TF_Status* s,
                           const char* name = "scalar");
 
 TF_Operation* Add(TF_Operation* l, TF_Operation* r, TF_Graph* graph,
@@ -71,6 +79,11 @@ TF_Operation* Add(TF_Output l, TF_Output r, TF_Graph* graph, TF_Status* s,
 
 TF_Operation* Min(TF_Operation* l, TF_Operation* r, TF_Graph* graph,
                   TF_Status* s, const char* name = "min");
+
+// If `op_device` is non-empty, set the created op on that device.
+TF_Operation* MinWithDevice(TF_Operation* l, TF_Operation* r, TF_Graph* graph,
+                            const string& op_device, TF_Status* s,
+                            const char* name = "min");
 
 TF_Operation* Neg(TF_Operation* n, TF_Graph* graph, TF_Status* s,
                   const char* name = "neg");
@@ -126,6 +139,8 @@ class CSession {
   void CloseAndDelete(TF_Status* s);
 
   TF_Tensor* output_tensor(int i) { return output_values_[i]; }
+
+  TF_Session* mutable_session() { return session_; }
 
  private:
   void DeleteInputValues();
