@@ -12,7 +12,16 @@ cc_library(
     name = "mkl_dnn",
     srcs = glob([
         "src/common/*.cpp",
+        "src/common/*.hpp",
         "src/cpu/*.cpp",
+        "src/cpu/*.hpp",
+        "src/cpu/gemm/*.cpp",
+        "src/cpu/gemm/*.hpp",
+        "src/cpu/xbyak/*.h",
+        "src/sycl/*.cpp",
+        "src/sycl/*.hpp",
+        "src/ocl/*.cpp",
+        "src/ocl/*.hpp",
     ]),
     hdrs = glob(["include/*"]),
     copts = ["-fexceptions"] + select({
@@ -33,4 +42,5 @@ cc_library(
     ],
     nocopts = "-fno-exceptions",
     visibility = ["//visibility:public"],
+    deps = ["@local_config_sycl//sycl"],
 )
