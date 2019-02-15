@@ -341,7 +341,7 @@ class MklInputConversionOp : public OpKernel {
                        memory::primitive_desc(input1_md, cpu_engine),
                        tensor_out, &net),
                    true);
-          stream(stream::kind::eager).submit(net).wait();
+          stream(cpu_engine).submit(net).wait();
 
           // Input1 will be passed through
           ForwardMklTensorInToOut(context, kInputIndex_1, kInputIndex_1);
@@ -446,7 +446,7 @@ class MklInputConversionOp : public OpKernel {
         tensor_out->CopyFrom(*tf_tensor, tensor_out->shape());
       }
       else  
-        stream(stream::kind::eager).submit(net).wait();
+        stream(cpu_engine).submit(net).wait();
 
       // -- The tensor in MKL format passes through --
       ForwardMklTensorInToOut(context, mkl_tensor_index, mkl_tensor_index);

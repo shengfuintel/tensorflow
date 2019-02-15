@@ -806,7 +806,7 @@ class MklConcatOp : public OpKernel {
 
       auto concat_op = concat(concat_pd, inputs, dst.GetOpMem());
       net.push_back(concat_op);
-      stream(stream::kind::eager).submit(net).wait();
+      stream(cpu_engine).submit(net).wait();
     } catch (mkldnn::error& e) {
       string error_msg = "Status: " + std::to_string(e.status) +
                          ", message: " + string(e.message) + ", in file " +

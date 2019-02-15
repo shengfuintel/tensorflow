@@ -654,7 +654,7 @@ class MklConv2DCustomBackpropFilterOp
       output->InsertReorderToUserMem(&net);
     }
 
-    stream(stream::kind::eager).submit(net).wait();
+    stream(cpu_engine).submit(net).wait();
   }
 };
 

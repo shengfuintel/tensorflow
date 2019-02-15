@@ -859,7 +859,7 @@ class MklLRNOp : public OpKernel {
       net.push_back(lrn_forward(lrn_fwd_desc, src_dnn_data->GetOpMem(),
                                 dst_dnn_data->GetOpMem()));
     }
-    stream(stream::kind::eager).submit(net).wait();
+    stream(cpu_engine).submit(net).wait();
   }
 
   void AllocateOutputTensor(
@@ -1177,7 +1177,7 @@ class MklLRNGradOp : public OpKernel {
                                  workspace_dnn_data->GetOpMem(),
                                  output_diff_src->GetOpMem()));
     }
-    stream(stream::kind::eager).submit(net).wait();
+    stream(cpu_engine).submit(net).wait();
   }
 
   void ConfigureWorkspace(const Tensor& workspace_tensor,

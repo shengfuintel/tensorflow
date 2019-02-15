@@ -737,7 +737,7 @@ inline Tensor ConvertMklToTF(OpKernelContext* context, const Tensor& mkl_tensor,
       std::vector<primitive> net;
       CHECK_EQ(input.CheckReorderToOpMem(output_tf_pd, &output_tensor, &net),
              true);
-      stream(stream::kind::eager).submit(net).wait();
+      stream(cpu_engine).submit(net).wait();
     } else {
       // If not, just forward input tensor to output tensor.
       CHECK(output_tensor.CopyFrom(mkl_tensor, output_shape));

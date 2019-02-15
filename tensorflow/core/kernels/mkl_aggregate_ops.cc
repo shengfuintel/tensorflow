@@ -482,7 +482,7 @@ class MklAddNOp : public OpKernel {
 
       // Create Sum op, and submit net for execution.
       net.push_back(sum(sum_pd, inputs, dst.GetOpMem()));
-      stream(stream::kind::eager).submit(net).wait();
+      stream(cpu_engine).submit(net).wait();
     } catch (mkldnn::error& e) {
       string error_msg = "Status: " + std::to_string(e.status) +
                          ", message: " + string(e.message) + ", in file " +

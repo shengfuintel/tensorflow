@@ -131,7 +131,7 @@ class MklSoftmaxOp : public OpKernel {
       // following 3 are common for all mkl dnn ops
       std::vector<primitive> net;
       net.push_back(softmax_fwd);
-      stream(stream::kind::eager).submit(net).wait();
+      stream(cpu_engine).submit(net).wait();
     } catch (mkldnn::error& e) {
       string error_msg = "Status: " + std::to_string(e.status) +
                          ", message: " + string(e.message) + ", in file " +

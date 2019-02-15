@@ -264,7 +264,7 @@ class MklReshapeOp : public OpKernel {
             std::vector<primitive> net;
             if (dnn_data_input.CheckReorderToOpMem(output_tf_pd, output_tensor,
                                                    &net)) {
-              stream(stream::kind::eager).submit(net).wait();
+              stream(cpu_engine).submit(net).wait();
             } else {
               OP_REQUIRES(
                   context, output_tensor->CopyFrom(input_tensor, shape_to),

@@ -570,7 +570,7 @@ class MklMaxPoolingOp : public MklPoolingForwardOpBase<T> {
       AllocateWorkspaceTensor(context, pool_fwd_desc, &dnn_data_wksp);
       OP_REQUIRES_OK(context, context->status());
 
-      this->PrepareAndExecuteNet(pool_fwd_desc, &dnn_data_input,
+      this->PrepareAndExecuteNet(cpu_engine, pool_fwd_desc, &dnn_data_input,
                                  &dnn_data_output, &dnn_data_wksp);
     } catch (mkldnn::error& e) {
       string error_msg = "Status: " + std::to_string(e.status) +
@@ -697,6 +697,7 @@ class MklMaxPoolingGradOp : public MklPoolingBackwardOpBase<T> {
                          pool_fwd_prim_desc.workspace_primitive_desc(),
                          &workspace_dnn_data);
       this->PrepareAndExecuteNet(
+          cpu_engine, 
           pool_bkwd_prim_desc, &grad_dnn_data, &output_dnn_data,
           memory::primitive_desc(target_diff_dst_md, cpu_engine),
           &workspace_dnn_data);

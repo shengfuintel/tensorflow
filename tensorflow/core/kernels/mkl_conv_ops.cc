@@ -85,7 +85,7 @@ template <typename T>
 class Conv2DFwd : public DnnOp {
  public:
   explicit Conv2DFwd(const ConvFwdDimensions& convFwdDims) {
-    fwd_stream_.reset(new stream(stream::kind::eager));
+    fwd_stream_.reset(new stream(cpu_engine_));
     // create conv primitive
     if (conv_fwd_ == nullptr) {
       Setup(convFwdDims);
@@ -862,7 +862,7 @@ class MklConv2DOp : public OpKernel {
           filter.CheckReorderToOpMem(
               conv_fwd_pd.get()->weights_primitive_desc(),
               filter.GetTensorBuffer(filter_out_tensor), &net);
-      stream(stream::kind::eager).submit(net).wait();
+      stream(cpu_engine).submit(net).wait();
 
       T* src_data = static_cast<T*>(
                 src.GetOpMem().get_data_handle());
@@ -984,7 +984,7 @@ class MklConv2DOp : public OpKernel {
                                         output->GetOpMem()));
     }
 
-    stream(stream::kind::eager).submit(net).wait();
+    stream(cpu_engine).submit(net).wait();
   }
 };
 

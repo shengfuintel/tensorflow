@@ -456,7 +456,7 @@ class MklConv2DCustomBackpropInputOp
     // Set buffer handle using allocated output tensor.
     output->SetUsrMemDataHandle(*output_tensor);
 
-    PrepareAndExecutePrimitive(bwd_pd, filter, outbackprop, output);
+    PrepareAndExecutePrimitive(cpu_engine, bwd_pd, filter, outbackprop, output);
   }
 
   // Allocate output tensor.
@@ -488,6 +488,7 @@ class MklConv2DCustomBackpropInputOp
 
   // Prepare and execute net - checks for input and output reorders.
   void PrepareAndExecutePrimitive(
+      const engine& cpu_engine,
       const convolution_backward_data::primitive_desc& conv_pd,
       MklDnnData<T>* filter, MklDnnData<T>* obp, MklDnnData<T>* output) {
     // Create reorders between user layout and MKL layout if it is needed and
@@ -499,7 +500,7 @@ class MklConv2DCustomBackpropInputOp
     net.push_back(convolution_backward_data(
         conv_pd, obp->GetOpMem(), filter->GetOpMem(), output->GetOpMem()));
 
-    stream(stream::kind::eager).submit(net).wait();
+    stream(cpu_engine).submit(net).wait();
   }
 };
 

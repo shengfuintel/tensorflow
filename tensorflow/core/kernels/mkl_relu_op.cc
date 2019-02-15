@@ -455,7 +455,7 @@ class MklReluOpBase : public OpKernel {
       auto relu_fwd =
           relu_forward(*relu_fwd_pd, src.GetOpMem(), dst.GetOpMem());
       net.push_back(relu_fwd);
-      stream(stream::kind::eager).submit(net).wait();
+      stream(cpu_engine).submit(net).wait();
     } catch (mkldnn::error& e) {
       string error_msg = "Status: " + std::to_string(e.status) +
                          ", message: " + string(e.message) + ", in file " +
@@ -648,7 +648,7 @@ class MklReluGradOpBase : public OpKernel {
 
     net.push_back(relu_backward(relu_prim_desc, src->GetOpMem(),
                                 diff_dst->GetOpMem(), diff_src->GetOpMem()));
-    stream(stream::kind::eager).submit(net).wait();
+    stream(cpu_engine).submit(net).wait();
   }
 };
 

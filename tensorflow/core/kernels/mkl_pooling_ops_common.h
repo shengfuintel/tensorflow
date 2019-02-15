@@ -249,7 +249,7 @@ class MklPoolingForwardOpBase : public MklPoolingOpBase<T> {
       net.push_back(
           pooling_forward(pool_fwd_desc, src->GetOpMem(), dst->GetOpMem()));
     }
-    stream(stream::kind::eager).submit(net).wait();
+    stream(cpu_engine).submit(net).wait();
   }
 
   void SanityCheckInput(OpKernelContext* context, const Tensor& input_tensor,
@@ -322,7 +322,7 @@ class MklPoolingBackwardOpBase : public MklPoolingOpBase<T> {
           pooling_backward(pool_bkwd_desc, input_gradient_diff_dst->GetOpMem(),
                            workspace->GetOpMem(), output_diff_src->GetOpMem()));
     }
-    stream(stream::kind::eager).submit(net).wait();
+    stream(cpu_engine).submit(net).wait();
   }
 
   // Max Pooling and Avg Pooling have slightly different implementations

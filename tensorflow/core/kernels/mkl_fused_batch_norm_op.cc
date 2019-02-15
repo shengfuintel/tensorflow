@@ -896,7 +896,7 @@ class MklFusedBatchNormOp : public OpKernel {
       }
       std::vector<primitive> net;
       net.push_back(bnrm_fwd_op);
-      stream(stream::kind::eager).submit(net).wait();
+      stream(cpu_engine).submit(net).wait();
 
       // copy batch_mean data
       T* batch_mean_data_tf =
@@ -1284,7 +1284,7 @@ class MklFusedBatchNormGradOp : public OpKernel {
           diff_dst.GetOpMem(), weights_m, diff_src.GetOpMem(), diff_weights_m);
 
       net.push_back(bnrm_bwd_op);
-      stream(stream::kind::eager).submit(net).wait();
+      stream(cpu_engine).submit(net).wait();
 
       // allocate 4 output TF tensors
       Tensor* diff_scale_tensor = nullptr;
