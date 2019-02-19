@@ -25,7 +25,6 @@ build --define framework_shared_object=true
 # If you would like to use a local MKL instead of downloading, please set the
 # environment variable "TF_MKL_ROOT" every time before build.
 build:mkl --define=using_mkl=true
-build:mkl -c opt
 
 build:download_clang --crosstool_top=@local_config_download_clang//:toolchain
 build:download_clang --define=using_clang=true
