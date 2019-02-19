@@ -99,7 +99,7 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
           "https://mirror.bazel.build/gitlab.devtools.intel.com/ipl/mkl-dnn/-/archive/prv-sycl-support/mkl-dnn-prv-sycl-support.tar.gz",
           "https://gitlab.devtools.intel.com/ipl/mkl-dnn/-/archive/prv-sycl-support/mkl-dnn-prv-sycl-support.tar.gz",
       ],
-      sha256 = "e6d085b6bf44fec1bb0a989710d780ec315542085874bb6597df4fc0e5a20bbd",
+      sha256 = "662c654b1b9448a650bcaf4ef0af49fc1a0b540b28eee5971ed22983ad987234",
       strip_prefix = "mkl-dnn-prv-sycl-support",
       build_file = clean_dep("//third_party/mkl_dnn:mkldnn.BUILD"),
   )

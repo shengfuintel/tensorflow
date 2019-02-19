@@ -623,7 +623,7 @@ class MklReluGradOpBase : public OpKernel {
       // inputs.
       diff_src.SetUsrMem(common_md, diff_src_tensor);
 
-      PrepareAndExecuteNet(relu_bwd_pd, &src, &diff_src, &diff_dst);
+      PrepareAndExecuteNet(cpu_engine, relu_bwd_pd, &src, &diff_src, &diff_dst);
     } catch (mkldnn::error& e) {
       string error_msg = "Status: " + std::to_string(e.status) +
                          ", message: " + string(e.message) + ", in file " +
@@ -634,7 +634,8 @@ class MklReluGradOpBase : public OpKernel {
     }
   }
 
-  void PrepareAndExecuteNet(const relu_backward::primitive_desc& relu_prim_desc,
+  void PrepareAndExecuteNet(engine &cpu_engine, 
+                            const relu_backward::primitive_desc& relu_prim_desc,
                             MklDnnData<T>* src, MklDnnData<T>* diff_src,
                             MklDnnData<T>* diff_dst) {
     std::vector<primitive> net;

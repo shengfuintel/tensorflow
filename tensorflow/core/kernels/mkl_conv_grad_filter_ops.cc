@@ -558,7 +558,7 @@ class MklConv2DCustomBackpropFilterOp
       bias_grad->SetUsrMem(bias_grad_md, bias_grad_tensor);
       bias_grad->SetUsrMemDataHandle(bias_grad_tensor);
 
-      PrepareAndExecutePrimitive(bwd_pd, input, outbackprop, output,
+      PrepareAndExecutePrimitive(cpu_engine, bwd_pd, input, outbackprop, output,
                                   bias_grad);
     } else {
       // Create convolution backward weights primitive.
@@ -583,7 +583,7 @@ class MklConv2DCustomBackpropFilterOp
       CHECK_NOTNULL(*output_tensor);
       // Set buffer handle using allocated output tensor.
       output->SetUsrMemDataHandle(*output_tensor);
-      PrepareAndExecutePrimitive(bwd_pd, input, outbackprop, output);
+      PrepareAndExecutePrimitive(cpu_engine, bwd_pd, input, outbackprop, output);
     }
   }
 
@@ -627,6 +627,7 @@ class MklConv2DCustomBackpropFilterOp
 
   // Prepare and execute net - checks for input and output reorders.
   void PrepareAndExecutePrimitive(
+      const engine &cpu_engine,
       const convolution_backward_weights::primitive_desc& conv_pd,
       MklDnnData<T>* input, MklDnnData<T>* obp, MklDnnData<T>* output,
       MklDnnData<T>* bias_grad = nullptr) {

@@ -828,7 +828,7 @@ class MklLRNOp : public OpKernel {
       AllocateWorkspaceTensor(context, lrn_prim_desc, &workspace_dnn_data);
       OP_REQUIRES_OK(context, context->status());
 
-      PrepareAndExecuteNet(lrn_prim_desc, &src_dnn_data, &dst_dnn_data,
+      PrepareAndExecuteNet(cpu_engine, lrn_prim_desc, &src_dnn_data, &dst_dnn_data,
                            &workspace_dnn_data);
     } catch (mkldnn::error& e) {
       string error_msg = "Status: " + std::to_string(e.status) +
@@ -841,7 +841,8 @@ class MklLRNOp : public OpKernel {
   }
 
  private:
-  void PrepareAndExecuteNet(const lrn_forward::primitive_desc& lrn_fwd_desc,
+  void PrepareAndExecuteNet(engine &cpu_engine,
+                            const lrn_forward::primitive_desc& lrn_fwd_desc,
                             MklDnnData<T>* src_dnn_data,
                             MklDnnData<T>* dst_dnn_data,
                             MklDnnData<uint8>* wksp_dnn_data = nullptr) {
@@ -1098,6 +1099,7 @@ class MklLRNGradOp : public OpKernel {
                          &workspace_dnn_data);
 
       PrepareAndExecuteNet(
+          cpu_engine, 
           lrn_bwd_prim_desc, lrn_fwd_prim_desc, &orig_input_dnn_data,
           &input_grad_dnn_data, &output_dnn_data,
           memory::primitive_desc(target_diff_dst_md, cpu_engine),
@@ -1152,6 +1154,7 @@ class MklLRNGradOp : public OpKernel {
   }
 
   void PrepareAndExecuteNet(
+      engine &cpu_engine,
       const lrn_backward::primitive_desc& lrn_bkwd_desc,
       const lrn_forward::primitive_desc& lrn_fwd_desc,
       MklDnnData<T>* src_dnn_data, MklDnnData<T>* input_gradient_diff_dst,

@@ -236,6 +236,7 @@ class MklPoolingForwardOpBase : public MklPoolingOpBase<T> {
   }
 
   void PrepareAndExecuteNet(
+      engine &cpu_engine,
       const pooling_forward::primitive_desc& pool_fwd_desc,
       const MklDnnData<T>* src, MklDnnData<T>* dst,
       MklDnnData<uint8>* wksp = nullptr) {
@@ -302,6 +303,7 @@ class MklPoolingBackwardOpBase : public MklPoolingOpBase<T> {
   }
 
   void PrepareAndExecuteNet(
+      engine &cpu_engine,
       const pooling_backward::primitive_desc& pool_bkwd_desc,
       MklDnnData<T>* input_gradient_diff_dst, MklDnnData<T>* output_diff_src,
       const memory::primitive_desc& target_diff_dst_pd,

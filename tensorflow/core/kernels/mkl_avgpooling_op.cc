@@ -524,7 +524,7 @@ class MklAvgPoolingOp : public MklPoolingForwardOpBase<T> {
       OP_REQUIRES_OK(context, context->status());
       dnn_data_output.SetUsrMemDataHandle(output_tensor);
 
-      this->PrepareAndExecuteNet(pool_prim_desc, &dnn_data_input,
+      this->PrepareAndExecuteNet(cpu_engine, pool_prim_desc, &dnn_data_input,
                                  &dnn_data_output);
     } catch (mkldnn::error& e) {
       string error_msg = "Status: " + std::to_string(e.status) +
@@ -630,6 +630,7 @@ class MklAvgPoolingGradOp : public MklPoolingBackwardOpBase<T> {
       output_diff_src.SetUsrMemDataHandle(output_tensor_diff_src);
 
       this->PrepareAndExecuteNet(
+          cpu_engine,
           pool_bkwd_prim_desc, &input_gradient_diff_dst, &output_diff_src,
           memory::primitive_desc(target_diff_dst_md, cpu_engine));
     } catch (mkldnn::error& e) {
