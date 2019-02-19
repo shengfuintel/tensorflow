@@ -1353,12 +1353,14 @@ def set_sycl_data_types(environ_cp):
   if use_half == 0:
     for config in configs:
       write_to_bazelrc('build:' + config + ' --cxxopt=-DTENSORFLOW_SYCL_NO_HALF=1')
+      write_to_bazelrc('build:' + config + ' --host_cxxopt=-DTENSORFLOW_SYCL_NO_HALF=1')
 
   use_double = int(
       get_var(environ_cp, 'TF_USE_DOUBLE_SYCL', 'double types in SYCL', True))
   if use_double == 0:
     for config in configs:
       write_to_bazelrc('build:' + config + ' --cxxopt=-DTENSORFLOW_SYCL_NO_DOUBLE=1')
+      write_to_bazelrc('build:' + config + ' --host_cxxopt=-DTENSORFLOW_SYCL_NO_DOUBLE=1')
 
 def set_mpi_home(environ_cp):
   """Set MPI_HOME."""

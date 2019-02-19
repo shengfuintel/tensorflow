@@ -2,7 +2,7 @@
 
 export TEST_TMPDIR=/dataset/sfu2/cache/sycl
 
- cp /dataset/sfu2/nervana/git/mkldnn-sycl/mkl-dnn/build/mkldnn_config.h /dataset/sfu2/cache/sycl/_bazel_sfu2/972ddc02f896eef702e3ea03a320b700/external/mkl_dnn/include
+cp /dataset/sfu2/nervana/git/mkldnn-sycl/mkl-dnn/build/mkldnn_config.h /dataset/sfu2/cache/sycl/_bazel_sfu2/972ddc02f896eef702e3ea03a320b700/external/mkl_dnn/include
 
 cp /dataset/sfu2/nervana/git/mkldnn-sycl/mkl-dnn/build/src/ocl/*_cl.cpp /dataset/sfu2/cache/sycl/_bazel_sfu2/972ddc02f896eef702e3ea03a320b700/external/mkl_dnn/src/ocl
 
