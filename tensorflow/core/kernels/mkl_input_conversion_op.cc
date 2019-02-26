@@ -501,5 +501,20 @@ class MklInputConversionOp : public OpKernel {
 // TF_CALL_NUMBER_TYPES(REGISTER_CPU);
 TF_CALL_float(REGISTER_CPU);
 #undef REGISTER_CPU
+
+#ifdef TENSORFLOW_USE_SYCL
+
+#define REGISTER_SYCL(T)                                             \
+  REGISTER_KERNEL_BUILDER(Name("_MklInputConversion")               \
+                              .Device(DEVICE_SYCL)                   \
+                              .TypeConstraint<T>("T")               \
+                              .Label(mkl_op_registry::kMklOpLabel), \
+                          MklInputConversionOp<SYCLDevice, T>);
+
+TF_CALL_float(REGISTER_SYCL);
+#undef REGISTER_SYCL
+
+#endif
+
 }  // namespace tensorflow
 #endif  // INTEL_MKL

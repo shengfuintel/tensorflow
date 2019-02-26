@@ -44,6 +44,10 @@ namespace tensorflow {
 
 typedef Eigen::ThreadPoolDevice CPUDevice;
 
+#ifdef TENSORFLOW_USE_SYCL
+typedef Eigen::SyclDevice SYCLDevice;
+#endif 
+
 struct MklReluHelpers {
   static void ValidateSameSizeHelper(OpKernelContext* context, const Tensor& g,
                                      const Tensor& a) {
@@ -383,7 +387,15 @@ class MklReluOpBase : public OpKernel {
 
   void Compute(OpKernelContext* context) override {
     try {
-      auto cpu_engine = engine(engine::cpu, 0);
+      engine  *my_engine;
+      if(std::is_same<Device, CPUDevice>::value)
+        my_engine = new engine(engine::cpu, 0);
+      else{
+        const Eigen::SyclDevice& sycl_device = context->eigen_sycl_device();
+        cl::sycl::queue &my_queue = sycl_device.m_queue_stream->sycl_queue();
+        //my_engine = new engine(engine::gpu, my_queue.get_device(), my_queue.get_context());
+        my_engine = new engine(engine::gpu, 0);
+      }
       const size_t src_index = 0;  // index of src input tensor
       const size_t dst_index = 0;  // index of dst output tensor
       const Tensor& src_tensor = MklGetInput(context, src_index);
@@ -397,8 +409,8 @@ class MklReluOpBase : public OpKernel {
       }
 
       // Create relu primitive.
-      MklDnnData<T> src(&cpu_engine);
-      MklDnnData<T> dst(&cpu_engine);
+      MklDnnData<T> src(my_engine);
+      MklDnnData<T> dst(my_engine);
 
       // Set DNN primitive - src
       memory::desc src_md({}, memory::data_undef, memory::format_undef);
@@ -419,7 +431,7 @@ class MklReluOpBase : public OpKernel {
           // Operator memory descriptor is same as user memory descriptor.
           alg_kind, src.GetUsrMemDesc(), alpha, beta);
       relu_fwd_pd.reset(
-          new relu_forward::primitive_desc(relu_fwd_desc, cpu_engine));
+          new relu_forward::primitive_desc(relu_fwd_desc, *my_engine));
 
       // allocate dst tensor
       MklDnnShape dnn_shape_dst;
@@ -455,7 +467,7 @@ class MklReluOpBase : public OpKernel {
       auto relu_fwd =
           relu_forward(*relu_fwd_pd, src.GetOpMem(), dst.GetOpMem());
       net.push_back(relu_fwd);
-      stream(cpu_engine).submit(net).wait();
+      stream(*my_engine).submit(net).wait();
     } catch (mkldnn::error& e) {
       string error_msg = "Status: " + std::to_string(e.status) +
                          ", message: " + string(e.message) + ", in file " +
@@ -873,6 +885,19 @@ class MklTanhGradOp : public MklReluGradOpBase<Device, T, eltwise_tanh> {
                               .Label(mkl_op_registry::kMklOpLabel), \
                           MklReluGradOp<CPUDevice, type>);
 TF_CALL_float(REGISTER_RELU_MKL_SUPPORTED_KERNELS_TYPES);
+
+#ifdef TENSORFLOW_USE_SYCL
+
+#define REGISTER_SYCL_RELU_MKL_SUPPORTED_KERNELS_TYPES(type)        \
+  REGISTER_KERNEL_BUILDER(Name("_MklRelu")                          \
+                              .Device(DEVICE_SYCL)                  \
+                              .HostMemory("mkl_features")           \
+                              .TypeConstraint<type>("T")            \
+                              .Label(mkl_op_registry::kMklOpLabel), \
+                          MklReluOp<SYCLDevice, type>);              
+TF_CALL_float(REGISTER_SYCL_RELU_MKL_SUPPORTED_KERNELS_TYPES);
+
+#endif 
 
 #ifndef INTEL_MKL_ML
 

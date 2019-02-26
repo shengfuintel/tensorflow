@@ -43,6 +43,10 @@ using mkldnn::stream;
 namespace tensorflow {
 typedef Eigen::ThreadPoolDevice CPUDevice;
 
+#ifdef TENSORFLOW_USE_SYCL
+typedef Eigen::SyclDevice SYCLDevice;
+#endif 
+
 ///////////////////////////////////////////////////////////
 //               Op kernel
 ///////////////////////////////////////////////////////////
@@ -202,6 +206,22 @@ class MklToTfOp : public OpKernel {
 
 TF_CALL_NUMBER_TYPES(REGISTER_CPU);
 #undef REGISTER_CPU
+
+
+#ifdef TENSORFLOW_USE_SYCL
+
+#define REGISTER_SYCL(T)                                             \
+  REGISTER_KERNEL_BUILDER(Name("_MklToTf")                          \
+                              .Device(DEVICE_SYCL)                   \
+                              .TypeConstraint<T>("T")               \
+                              .Label(mkl_op_registry::kMklOpLabel), \
+                          MklToTfOp<SYCLDevice, T>);
+
+TF_CALL_NUMBER_TYPES(REGISTER_SYCL);
+#undef REGISTER_SYCL
+
+#endif
+
 }  // namespace tensorflow
 #endif  // INTEL_MKL
 #endif  // TENSORFLOW_CORE_KERNELS_MKL_TFCONV_OP_H_

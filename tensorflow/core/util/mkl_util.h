@@ -861,9 +861,11 @@ inline void AllocateOutputSetMklShape(OpKernelContext* ctext, int n,
   Tensor* second_tensor = nullptr;
   TensorShape second_shape;
   second_shape.AddDim(mkl_shape.GetSerializeBufferSize());
+  AllocatorAttributes alloc_attr;
+  alloc_attr.set_on_host(true);
   OP_REQUIRES_OK(ctext, ctext->allocate_output(
                             GetTensorMetaDataIndex(n, ctext->num_outputs()),
-                            second_shape, &second_tensor));
+                            second_shape, &second_tensor, alloc_attr));
   mkl_shape.SerializeMklDnnShape(
       second_tensor->flat<uint8>().data(),
       second_tensor->flat<uint8>().size() * sizeof(uint8));
@@ -903,9 +905,11 @@ inline void AllocateOutputSetMklShape(OpKernelContext* ctext, int n,
   OP_REQUIRES_OK(
       ctext, ctext->allocate_output(GetTensorDataIndex(n, ctext->num_outputs()),
                                     tf_shape, output));
+  AllocatorAttributes alloc_attr;
+  alloc_attr.set_on_host(true);
   OP_REQUIRES_OK(ctext, ctext->allocate_output(
                             GetTensorMetaDataIndex(n, ctext->num_outputs()),
-                            second_shape, &second_tensor));
+                            second_shape, &second_tensor, alloc_attr));
   mkl_shape.SerializeMklDnnShape(
       second_tensor->flat<uint8>().data(),
       second_tensor->flat<uint8>().size() * sizeof(uint8));

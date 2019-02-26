@@ -18,6 +18,7 @@ limitations under the License.
 #include <atomic>
 #include <string>
 #include <vector>
+#include <fstream>
 
 #include "tensorflow/core/common_runtime/collective_executor_mgr.h"
 #include "tensorflow/core/common_runtime/collective_param_resolver_local.h"
@@ -1487,6 +1488,7 @@ Status DirectSession::CreateGraphs(
       OptimizationPassRegistry::POST_PARTITIONING, optimization_options));
 
   Status s;
+  int part_index = 0;
   for (auto& partition : *outputs) {
     const string& partition_name = partition.first;
     std::unique_ptr<Graph>* graph = &partition.second;
@@ -1502,6 +1504,23 @@ Status DirectSession::CreateGraphs(
     if (!s.ok()) {
       break;
     }
+
+    // save the final optimized graph to disk.
+    GraphDef graph_def;
+    (*graph)->ToGraphDef(&graph_def);
+    string pb_string = ProtoDebugString(graph_def);
+    std::filebuf fb;
+    char fn[2048];
+    if(part_index == 0)
+      sprintf(fn, "./model.pbtxt");
+    else
+      sprintf(fn, "./model_%d.pbtxt", part_index);
+    fb.open (fn, std::ios::out);
+    std::ostream os(&fb);
+    os << pb_string << "\n";
+    fb.close();
+
+    part_index ++;
   }
   *flib_def = std::move(client_graph->flib_def);
   std::swap(*input_types, client_graph->feed_types);

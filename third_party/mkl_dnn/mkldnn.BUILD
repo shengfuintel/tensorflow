@@ -20,6 +20,7 @@ cc_library(
         "src/cpu/xbyak/*.h",
         "src/sycl/*.cpp",
         "src/sycl/*.hpp",
+        "src/sycl/cxxapi/*.cpp",
         "src/ocl/*.cpp",
         "src/ocl/*.hpp",
     ]),
