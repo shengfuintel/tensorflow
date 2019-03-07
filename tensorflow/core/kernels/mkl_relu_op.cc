@@ -23,6 +23,8 @@ limitations under the License.
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/lib/core/errors.h"
 
+#include "tensorflow/core/common_runtime/dma_helper.h"
+
 #include "mkl_dnn.h"
 #include "mkl_dnn_types.h"
 #include "tensorflow/core/util/mkl_util.h"
@@ -387,15 +389,49 @@ class MklReluOpBase : public OpKernel {
 
   void Compute(OpKernelContext* context) override {
     try {
-      engine  *my_engine;
+/*
+      using namespace mkldnn;
+      auto cpu_engine = engine(engine::gpu, 0);
+
+      const auto tz = memory::dims{2, 16, 1, 1};
+
+      auto m_input = memory({ { { tz }, memory::data_type::f32,
+            memory::format::nchw }, cpu_engine});
+
+        //fill(m_input, tz);
+        //auto m_output = memory({ { { tz }, memory::data_type::f32,
+        //        memory::format::nchw }, cpu_engine});
+
+        // relu gpu 
+      auto relu_d = eltwise_forward::desc(prop_kind::forward,
+            algorithm::eltwise_relu, m_input.get_primitive_desc().desc(), .0f);
+
+      auto relu_pd = eltwise_forward::primitive_desc(relu_d, cpu_engine);
+
+      auto relu = eltwise_forward(relu_pd, m_input, m_input);
+
+      auto stream_cpu = stream(cpu_engine);
+      stream_cpu.submit({relu}).wait();
+      printf("+Finshed sycl run\n");
+
+      
       if(std::is_same<Device, CPUDevice>::value)
         my_engine = new engine(engine::cpu, 0);
-      else{
+      else{ 
+*/
+
+        engine  *my_engine;
         const Eigen::SyclDevice& sycl_device = context->eigen_sycl_device();
         cl::sycl::queue &my_queue = sycl_device.m_queue_stream->sycl_queue();
-        //my_engine = new engine(engine::gpu, my_queue.get_device(), my_queue.get_context());
-        my_engine = new engine(engine::gpu, 0);
-      }
+        const cl::sycl::device &my_device = my_queue.get_device();
+        const cl::sycl::context &my_context = my_queue.get_context();
+
+        cl::sycl::dcontext_shptr device_ptr = my_context.get_impl();
+        printf("device context count before create mkldnn engine = %ld\n", device_ptr.use_count());
+        my_engine = new engine(engine::gpu, my_device, my_context);
+        printf("device context count after create mkldnn engine = %ld\n", device_ptr.use_count());
+
+{
       const size_t src_index = 0;  // index of src input tensor
       const size_t dst_index = 0;  // index of dst output tensor
       const Tensor& src_tensor = MklGetInput(context, src_index);
@@ -422,7 +458,17 @@ class MklReluOpBase : public OpKernel {
         // Create blocked memory descriptor
         src_md = MklDnnData<T>::CreateBlockedMemDesc(src_dims, src_strides);
       }
-      src.SetUsrMem(src_md, &src_tensor);
+      const Eigen::SyclDevice& sycl_device = context->eigen_sycl_device();
+      const void *input_buffer = DMAHelper::base(&src_tensor);
+      cl::sycl::buffer<uint8_t, 1> sycl_buf = sycl_device.get_sycl_buffer(input_buffer);
+
+      src.SetUsrMem(src_md, sycl_buf);
+
+      float float_buffer[10];
+      sycl_device.memcpyDeviceToHost((void*)&float_buffer[0], input_buffer, 40);
+      for(int i=0; i<10; i++)
+        std::cout << float_buffer[i] << " ";
+      std::cout << "\n";
 
       T alpha = 0, beta = 0;
       std::shared_ptr<relu_forward::primitive_desc> relu_fwd_pd;
@@ -459,15 +505,30 @@ class MklReluOpBase : public OpKernel {
       AllocateOutputSetMklShape(context, dst_index, dnn_shape_dst);
 
       // Destination memory descriptor is same as source memory descriptor.
+      void *output_buffer = DMAHelper::base(dst_tensor);
+      cl::sycl::buffer<uint8_t, 1> sycl_out_buf = sycl_device.get_sycl_buffer(output_buffer);
       auto &dst_md = src_md;
-      dst.SetUsrMem(dst_md, dst_tensor);
+      dst.SetUsrMem(dst_md, sycl_out_buf);
 
       // execute net
       std::vector<primitive> net;
       auto relu_fwd =
           relu_forward(*relu_fwd_pd, src.GetOpMem(), dst.GetOpMem());
       net.push_back(relu_fwd);
+
+      std::cout << "Before submit primitive\n";
       stream(*my_engine).submit(net).wait();
+
+      sycl_device.memcpyDeviceToHost((void*)&float_buffer[0], output_buffer, 40);
+      for(int i=0; i<10; i++)
+        std::cout << float_buffer[i] << " ";
+      std::cout << "\n";
+
+}
+      delete my_engine;
+      printf("device context count after delete mkldnn engine = %ld\n", device_ptr.use_count());
+      std::cout << "After submit primitive\n";
+
     } catch (mkldnn::error& e) {
       string error_msg = "Status: " + std::to_string(e.status) +
                          ", message: " + string(e.message) + ", in file " +

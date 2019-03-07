@@ -21,6 +21,7 @@ limitations under the License.
 #include <vector>
 #include <unordered_map>
 #include <utility>
+#include <CL/sycl.hpp>
 
 #include "mkl_dnn.h"
 #include "mkl_dnn_types.h"
@@ -1570,6 +1571,13 @@ class MklDnnData {
     auto pd = memory::primitive_desc(md, *cpu_engine_);
     SetUsrMem(pd, data_buffer);
   }
+
+  inline void SetUsrMem(const memory::desc& md, cl::sycl::buffer<uint8_t, 1> &sycl_buffer) {
+    auto pd = memory::primitive_desc(md, *cpu_engine_);
+    user_memory_ = new memory(pd);
+    user_memory_->set_sycl_buffer(sycl_buffer);
+  }
+
 
   /// A version of SetUsrMem with memory descriptor and tensor
   inline void SetUsrMem(const memory::desc& md, const Tensor* tensor) {
